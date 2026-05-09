@@ -7,6 +7,7 @@ interface CurrencyInputProps {
   max?: number;
   step?: number;
   onChange: (value: number) => void;
+  error?: string;
 }
 
 export function CurrencyInput({
@@ -16,6 +17,7 @@ export function CurrencyInput({
   max = 10_000_000,
   step = 25_000,
   onChange,
+  error,
 }: CurrencyInputProps) {
-  return <SliderInput label={label} value={value} min={min} max={max} step={step} onChange={onChange} format="currency" />;
+  return <SliderInput label={label} value={value} min={min} max={max} step={step} onChange={onChange} format="currency" error={error} />;
 }

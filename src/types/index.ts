@@ -17,6 +17,7 @@ export interface SimInputs {
   socialSecurityAmount: number;
   spouseSocialSecurityAge: number;
   spouseSocialSecurityAmount: number;
+  otherRetirementIncome: number;
   spendingGoGo: number;
   spendingSlowGo: number;
   spendingNoGo: number;
@@ -58,11 +59,40 @@ export interface CollegeEvent {
 export interface SimResults {
   paths: number[][];
   percentilePaths: PercentilesAtAge[];
+  stackedBands: StackedBandDataPoint[];
   ruinProbability: number;
   medianTerminalWealth: number;
   successRate: number;
   verdictText: string;
   yearlyMedianSpend: number[];
+}
+
+export interface StackedBandDataPoint {
+  age: number;
+  broke: number;
+  struggling: number;
+  surviving: number;
+  thriving: number;
+  flourishing: number;
+  dead: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+}
+
+export type InputErrors = Partial<Record<keyof SimInputs, string>>;
+
+export interface StressScenario {
+  key: string;
+  label: string;
+  yearOneReturn?: number;
+  yearTwoReturn?: number;
+  yearThreeReturn?: number;
+  overrideInflation?: number;
+  overrideReturn?: number;
+  years?: number;
 }
 
 export interface PercentilesAtAge {

@@ -1,12 +1,12 @@
-import { Landmark, PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
-import { HeroVerdict } from "@/components/dashboard/HeroVerdict";
-import { StatCard } from "@/components/dashboard/StatCard";
-import { NetWorthBreakdown } from "@/components/dashboard/NetWorthBreakdown";
-import { WealthFanChart } from "@/components/charts/WealthFanChart";
-import { SpendingSmileChart } from "@/components/charts/SpendingSmileChart";
+import { PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
+import { RichBrokeDeadChart } from "@/components/charts/RichBrokeDeadChart";
 import { ScenarioCompareChart } from "@/components/charts/ScenarioCompareChart";
-import { ProbabilityGauge } from "@/components/charts/ProbabilityGauge";
-import { StressTestModal } from "@/components/modals/StressTestModal";
+import { SpendingSmileChart } from "@/components/charts/SpendingSmileChart";
+import { StressTestChart } from "@/components/charts/StressTestChart";
+import { WealthFanChart } from "@/components/charts/WealthFanChart";
+import { HeroVerdict } from "@/components/dashboard/HeroVerdict";
+import { NetWorthSnapshot } from "@/components/dashboard/NetWorthSnapshot";
+import { StatCard } from "@/components/dashboard/StatCard";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCompactCurrency, formatPercentage } from "@/lib/formatters";
@@ -21,76 +21,40 @@ function ruinTone(ruinProbability: number) {
 export function MainPanel() {
   const inputs = useSimStore((state) => state.inputs);
   const results = useSimStore((state) => state.results);
-  const ruinProbability = results?.ruinProbability ?? 0;
-  const successRate = results?.successRate ?? 0;
+  const errors = useSimStore((state) => state.errors);
+  const hasErrors = Object.keys(errors).length > 0;
 
   return (
-    <section className="grid gap-4 p-4 lg:p-6">
+    <section className="grid gap-4 p-4 pb-28 md:pb-4 lg:p-6">
+      {hasErrors ? <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-red-200">Fix inputs above to update simulation</div> : null}
       <HeroVerdict inputs={inputs} results={results} />
-
-      <div className="grid gap-4 xl:grid-cols-[1fr_180px]">
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatCard
-            icon={ShieldAlert}
-            label="Ruin Probability"
-            value={formatPercentage(ruinProbability, 1)}
-            description="Share of simulations depleted before the planning age."
-            tone={ruinTone(ruinProbability)}
-          />
-          <StatCard
-            icon={PiggyBank}
-            label="Median Terminal Wealth"
-            value={formatCompactCurrency(results?.medianTerminalWealth ?? 0)}
-            description={`Median portfolio value at age ${inputs.planningAge}.`}
-            tone="neutral"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="Success Rate"
-            value={formatPercentage(successRate, 1)}
-            description="Inverse of ruin probability across all paths."
-            tone={successRate > 0.85 ? "success" : successRate >= 0.7 ? "warning" : "danger"}
-          />
-        </div>
-        <Card className="shadow-none">
-          <CardContent className="grid h-full place-items-center p-4">
-            <ProbabilityGauge value={successRate} />
-          </CardContent>
-        </Card>
+      <NetWorthSnapshot inputs={inputs} />
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard icon={ShieldAlert} label="Ruin Probability" value={results ? formatPercentage(results.ruinProbability, 1) : "--"} description="Paths that ever depleted during retirement." tone={results ? ruinTone(results.ruinProbability) : "neutral"} />
+        <StatCard icon={PiggyBank} label="Median Terminal Wealth" value={results ? formatCompactCurrency(results.medianTerminalWealth) : "--"} description={`Median portfolio value at age ${inputs.planningAge}.`} tone="neutral" />
+        <StatCard icon={TrendingUp} label="Success Rate" value={results ? formatPercentage(results.successRate, 1) : "--"} description="Inverse of probability of ruin." tone={results && results.successRate >= 0.85 ? "success" : results && results.successRate >= 0.7 ? "warning" : "danger"} />
       </div>
-
-      <NetWorthBreakdown inputs={inputs} />
-
-      <Tabs defaultValue="wealth">
+      <Tabs defaultValue="rich">
         <Card className="shadow-none">
           <CardHeader className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-teal-200">
-                <Landmark size={14} />
-                Institutional forecast
-              </div>
-              <h2 className="mt-2 text-xl font-bold text-primaryText">Probability-band analytics</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-200">Probability Analytics</p>
+              <h2 className="mt-2 text-xl font-bold text-primaryText">Rich, Broke or Dead</h2>
             </div>
             <TabsList className="w-full overflow-x-auto lg:w-auto">
-              <TabsTrigger value="wealth">Wealth Trajectory</TabsTrigger>
+              <TabsTrigger value="rich">Rich/Broke/Dead</TabsTrigger>
+              <TabsTrigger value="wealth">Wealth Trajectories</TabsTrigger>
               <TabsTrigger value="spending">Spending Plan</TabsTrigger>
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-4">
-            <TabsContent value="wealth">
-              <WealthFanChart />
-            </TabsContent>
-            <TabsContent value="spending">
-              <SpendingSmileChart />
-            </TabsContent>
-            <TabsContent value="scenarios">
-              <ScenarioCompareChart />
-            </TabsContent>
-            <TabsContent value="stress">
-              <StressTestModal />
-            </TabsContent>
+            <TabsContent value="rich"><RichBrokeDeadChart /></TabsContent>
+            <TabsContent value="wealth"><WealthFanChart /></TabsContent>
+            <TabsContent value="spending"><SpendingSmileChart /></TabsContent>
+            <TabsContent value="scenarios"><ScenarioCompareChart /></TabsContent>
+            <TabsContent value="stress"><StressTestChart /></TabsContent>
           </CardContent>
         </Card>
       </Tabs>

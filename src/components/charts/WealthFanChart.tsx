@@ -32,7 +32,12 @@ export function WealthFanChart() {
   const inputs = useSimStore((state) => state.inputs);
   const results = useSimStore((state) => state.results);
   const setInput = useSimStore((state) => state.setInput);
+  const isRunning = useSimStore((state) => state.isRunning);
   const data = chartData(results?.percentilePaths ?? []);
+
+  if (isRunning) {
+    return <div className="h-[520px] animate-pulse rounded-lg border border-border bg-slate-700/30" />;
+  }
 
   return (
     <div className="grid gap-4">
@@ -76,6 +81,11 @@ export function WealthFanChart() {
               labelFormatter={(age) => `Age ${age}`}
             />
             <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 12 }} />
+            <ReferenceLine
+              y={0}
+              stroke="#dc2626"
+              strokeDasharray="5 5"
+            />
             <ReferenceLine
               x={inputs.retirementAge}
               stroke="#f59e0b"

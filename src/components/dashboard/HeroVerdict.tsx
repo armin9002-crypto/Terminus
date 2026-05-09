@@ -1,5 +1,4 @@
-import { CheckCircle2, CircleAlert, CircleX } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { getInvestableAssets } from "@/engine/monteCarlo";
 import { formatCompactCurrency, formatPercentage } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { SimInputs, SimResults } from "@/types";
@@ -9,54 +8,48 @@ interface HeroVerdictProps {
   results: SimResults | null;
 }
 
+function tone(successRate: number) {
+  if (successRate >= 0.85) return { border: "border-l-success", text: "text-success" };
+  if (successRate >= 0.7) return { border: "border-l-warning", text: "text-warning" };
+  return { border: "border-l-danger", text: "text-danger" };
+}
+
 export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
-  const successRate = results?.successRate ?? 0;
-  const isStrong = successRate > 0.85;
-  const isCaution = successRate >= 0.7 && successRate <= 0.85;
-  const Icon = isStrong ? CheckCircle2 : isCaution ? CircleAlert : CircleX;
+  const successRate = results?.successRate;
+  const activeTone = tone(successRate ?? 0);
 
   return (
-    <Card
-      className={cn(
-        "overflow-hidden shadow-none transition-colors duration-300",
-        isStrong && "border-success/30 bg-success/5",
-        isCaution && "border-warning/30 bg-warning/5",
-        !isStrong && !isCaution && "border-danger/30 bg-danger/5",
-      )}
-    >
-      <CardContent className="p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex gap-4">
-            <div
-              className={cn(
-                "flex size-12 shrink-0 items-center justify-center rounded-md border",
-                isStrong && "border-success/40 text-success",
-                isCaution && "border-warning/40 text-warning",
-                !isStrong && !isCaution && "border-danger/40 text-danger",
-              )}
-            >
-              <Icon size={26} />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mutedText">Live verdict</p>
-              <h1 className="mt-2 max-w-4xl text-2xl font-bold leading-tight text-primaryText md:text-4xl">
-                You can sustain {formatCompactCurrency(inputs.spendingGoGo)}/year with{" "}
-                {formatPercentage(successRate, 0)} confidence through age {inputs.planningAge}
-              </h1>
-              <p className="mt-3 text-sm text-mutedText">
-                Retire at {inputs.retirementAge} · {formatCompactCurrency(
-                  inputs.taxableAssets +
-                    inputs.taxDeferredAssets +
-                    inputs.taxFreeAssets +
-                    inputs.illiquidAssets +
-                    inputs.cashReserves,
-                )}{" "}
-                gross assets · {inputs.numSimulations.toLocaleString()} simulations
-              </p>
-            </div>
-          </div>
+    <section className={cn("min-h-[120px] rounded-lg border border-border border-l-4 bg-card p-5 shadow-terminal", activeTone.border)}>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)] lg:items-center">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-mutedText">Live verdict</p>
+          <h1 className="mt-2 text-[22px] font-bold leading-tight text-primaryText md:text-3xl">
+            You can sustain {formatCompactCurrency(inputs.spendingGoGo)}/year with{" "}
+            <span className={cn("transition-all duration-300", activeTone.text)}>
+              {successRate === undefined ? "--" : formatPercentage(successRate, 0)}
+            </span>{" "}
+            confidence through age {inputs.planningAge}
+          </h1>
+          <p className="mt-3 text-sm text-mutedText">
+            Retiring at {inputs.retirementAge} / {formatCompactCurrency(getInvestableAssets(inputs))} investable /{" "}
+            {inputs.numSimulations.toLocaleString()} simulations / Live model
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        <div className="grid grid-cols-3 gap-3">
+          <Pill label="Success Rate" value={successRate === undefined ? "--" : formatPercentage(successRate, 0)} className={activeTone.text} />
+          <Pill label="Median Terminal" value={results ? formatCompactCurrency(results.medianTerminalWealth) : "--"} />
+          <Pill label="Ruin Prob." value={results ? formatPercentage(results.ruinProbability, 0) : "--"} className={results && results.ruinProbability > 0.2 ? "text-danger" : ""} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Pill({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-[#111827] p-3 text-center">
+      <p className={cn("text-2xl font-bold transition-all duration-300", className)}>{value}</p>
+      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-mutedText">{label}</p>
+    </div>
   );
 }

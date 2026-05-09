@@ -19,6 +19,7 @@ export const DEFAULT_INPUTS: SimInputs = {
   socialSecurityAmount: 48_000,
   spouseSocialSecurityAge: 67,
   spouseSocialSecurityAmount: 32_000,
+  otherRetirementIncome: 0,
   spendingGoGo: 280_000,
   spendingSlowGo: 200_000,
   spendingNoGo: 150_000,
@@ -33,9 +34,9 @@ export const DEFAULT_INPUTS: SimInputs = {
     {
       id: "carry-1",
       label: "Carry distribution",
-      year: 60,
-      amount: 750_000,
-      probability: 0.65,
+      year: 52,
+      amount: 1_500_000,
+      probability: 0.7,
       taxType: "ltcg",
       confidence: "medium",
     },
@@ -62,3 +63,25 @@ export const HISTORICAL_SCENARIOS = [
   { name: "Global financial crisis", startYear: 2008, drawdown: -0.51 },
   { name: "Inflation shock", startYear: 1973, drawdown: -0.37 },
 ];
+
+export const SSA_MORTALITY_QX: Record<number, number> = {
+  50: 0.0044, 51: 0.0048, 52: 0.0053, 53: 0.0058, 54: 0.0064,
+  55: 0.0071, 56: 0.0078, 57: 0.0086, 58: 0.0095, 59: 0.0105,
+  60: 0.0116, 61: 0.0128, 62: 0.0141, 63: 0.0156, 64: 0.0172,
+  65: 0.019, 66: 0.0209, 67: 0.0231, 68: 0.0255, 69: 0.0281,
+  70: 0.031, 71: 0.0343, 72: 0.0379, 73: 0.0419, 74: 0.0463,
+  75: 0.0512, 76: 0.0566, 77: 0.0626, 78: 0.0692, 79: 0.0765,
+  80: 0.0845, 81: 0.0934, 82: 0.1031, 83: 0.1138, 84: 0.1255,
+  85: 0.1383, 86: 0.1523, 87: 0.1675, 88: 0.184, 89: 0.2018,
+  90: 0.221, 91: 0.2416, 92: 0.2635, 93: 0.2868, 94: 0.3113,
+  95: 0.3369, 96: 0.3633, 97: 0.3902, 98: 0.4172, 99: 0.444,
+  100: 0.47,
+};
+
+export const STRESS_SCENARIOS = [
+  { key: "2008", yearOneReturn: -0.37, yearTwoReturn: 0.265, label: "2008-09 Financial Crisis" },
+  { key: "dotcom", yearOneReturn: -0.09, yearTwoReturn: -0.12, yearThreeReturn: -0.22, label: "2000-02 Dot-com" },
+  { key: "stagflation", overrideInflation: 0.09, overrideReturn: 0.03, years: 10, label: "1970s Stagflation" },
+  { key: "peak", yearOneReturn: -0.45, label: "Retire at Peak (worst case)" },
+  { key: "japan", overrideReturn: 0, overrideInflation: 0.005, years: 10, label: "Japan 1990-2000" },
+] as const;
