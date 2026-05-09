@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+.vite/
+
+*.log
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+
+dev-server.out.log
+dev-server.err.log
+
+.DS_Store
+Thumbs.db
