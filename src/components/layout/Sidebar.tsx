@@ -9,9 +9,10 @@ import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { SliderInput } from "@/components/inputs/SliderInput";
 import { getInvestableAssets, getTotalNetWorth } from "@/engine/monteCarlo";
 import { formatCompactCurrency } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 import { useSimStore } from "@/store/useSimStore";
 import type { LumpyEvent } from "@/types";
-import { PRESETS } from "@/config/presets";
+import { PRESETS, Preset } from "@/config/presets";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 
 function Chip({ children }: { children: React.ReactNode }) {
@@ -28,11 +29,14 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const inputs = useSimStore((state) => state.inputs);
   const errors = useSimStore((state) => state.errors);
   const setInput = useSimStore((state) => state.setInput);
+  const setInputs = useSimStore((state) => state.setInputs);
   const addLumpyEvent = useSimStore((state) => state.addLumpyEvent);
   const updateLumpyEvent = useSimStore((state) => state.updateLumpyEvent);
   const removeLumpyEvent = useSimStore((state) => state.removeLumpyEvent);
   const investable = getInvestableAssets(inputs);
   const totalNW = getTotalNetWorth(inputs);
+  const gross = investable + inputs.illiquidAssets;
+  const liquidPct = gross > 0 ? (investable / gross) * 100 : 0;
 
   return (
     <aside className={`${mobile ? "max-h-[85vh]" : "h-[calc(100vh-56px)] lg:sticky lg:top-[56px]"} sidebar-scroll flex flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)]`}>
@@ -40,7 +44,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
         <div className="mb-8">
           <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-muted)] mb-4">Quick Start</h3>
           <div className="grid grid-cols-2 gap-3">
-            {PRESETS.map((p) => (
+            {PRESETS.map((p: Preset) => (
               <button
                 key={p.id}
                 onClick={() => setInputs(p.inputs)}
@@ -184,6 +188,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+      </div>
     </aside>
   );
 }

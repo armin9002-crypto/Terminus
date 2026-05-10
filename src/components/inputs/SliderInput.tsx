@@ -102,7 +102,7 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
       </div>
 
       {error && <p className="text-xs font-medium text-[var(--danger)]">{error}</p>}
-      <style jsx global>{`
+      <style>{`
         .SliderThumb {
           width: 18px; height: 18px;
           background: var(--accent);
