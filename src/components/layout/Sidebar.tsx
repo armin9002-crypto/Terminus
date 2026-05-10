@@ -12,7 +12,7 @@ import { formatCompactCurrency } from "../../lib/formatters";
 import { cn } from "../../lib/utils";
 import { useSimStore } from "../../store/useSimStore";
 import type { LumpyEvent } from "../../types";
-import { PRESETS, Preset } from "../../config/presets";
+import { PRESETS, type Preset } from "./presets";
 import { AnimatedNumber } from "../../components/ui/AnimatedNumber";
 
 function Chip({ children }: { children: React.ReactNode }) {
@@ -23,6 +23,8 @@ function confidenceToProbability(confidence: LumpyEvent["confidence"]) {
   if (confidence === "low") return 0.4;
   if (confidence === "high") return 0.9;
   return 0.7;
+}
+
 export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const inputs = useSimStore((state) => state.inputs);
   const errors = useSimStore((state) => state.errors);
@@ -160,5 +162,4 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
       </div>
     </aside>
   );
-}
 }

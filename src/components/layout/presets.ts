@@ -1,4 +1,4 @@
-import { SimInputs } from '../types';
+import type { SimInputs } from "../../types";
 
 export interface Preset {
   id: string;

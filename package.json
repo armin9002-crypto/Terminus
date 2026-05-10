@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --config vite.config.cjs",
-    "build": "tsc -b && vite build --config vite.config.cjs",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "preview": "vite preview --config vite.config.cjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
