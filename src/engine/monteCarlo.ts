@@ -21,9 +21,13 @@ function percentile(values: number[], target: number): number {
   return sorted[index] ?? 0;
 }
 
+// TODO: Move these to a central tax configuration or user inputs
+const ESTIMATED_ORDINARY_TAX_RATE = 0.40;
+const ESTIMATED_LTCG_TAX_RATE = 0.24;
+
 function taxableEventAmount(event: LumpyEvent): number {
-  if (event.taxType === "ordinary") return event.amount * 0.6;
-  if (event.taxType === "ltcg") return event.amount * 0.76;
+  if (event.taxType === "ordinary") return event.amount * (1 - ESTIMATED_ORDINARY_TAX_RATE);
+  if (event.taxType === "ltcg") return event.amount * (1 - ESTIMATED_LTCG_TAX_RATE);
   return event.amount;
 }
 
@@ -153,12 +157,18 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
         wealth = 0;
       } else {
         wealth = Math.max(0, wealth * (1 + stressed.annualReturn));
-        wealth += salaryIncome(age, inputs.currentAge, inputs.retirementAge, inputs.annualSalary, inputs.inflationRate);
-        wealth += inputs.hasSpouse
+        
+        // Calculate Gross Incomes
+        let annualGrossIncome = salaryIncome(age, inputs.currentAge, inputs.retirementAge, inputs.annualSalary, inputs.inflationRate);
+        annualGrossIncome += inputs.hasSpouse
           ? salaryIncome(age, inputs.spouseCurrentAge, inputs.spouseRetirementAge, inputs.spouseAnnualSalary, inputs.inflationRate)
           : 0;
-        wealth += socialSecurityIncome(age, inputs);
-        wealth += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, yearIndex) : 0;
+        annualGrossIncome += socialSecurityIncome(age, inputs);
+        annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, yearIndex) : 0;
+        
+        // Apply a basic tax estimate to income (assuming 25% effective rate for simplicity)
+        wealth += annualGrossIncome * 0.75;
+        
         wealth += lumpyEventCashFlow(age, inputs.lumpyEvents);
         wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);
         wealth -= age < inputs.retirementAge ? inputs.capitalCallObligations : 0;

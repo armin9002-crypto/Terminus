@@ -7,13 +7,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { AgeInput } from "@/components/inputs/AgeInput";
 import { CurrencyInput } from "@/components/inputs/CurrencyInput";
 import { SliderInput } from "@/components/inputs/SliderInput";
-import { getInvestableAssets } from "@/engine/monteCarlo";
+import { getInvestableAssets, getTotalNetWorth } from "@/engine/monteCarlo";
 import { formatCompactCurrency } from "@/lib/formatters";
 import { useSimStore } from "@/store/useSimStore";
 import type { LumpyEvent } from "@/types";
+import { PRESETS } from "@/config/presets";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 
 function Chip({ children }: { children: React.ReactNode }) {
-  return <span className="shrink-0 rounded-full border border-border bg-white/[0.04] px-2 py-1 text-[11px] text-mutedText">{children}</span>;
+  return <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-muted)]">{children}</span>;
 }
 
 function confidenceToProbability(confidence: LumpyEvent["confidence"]) {
@@ -30,13 +32,35 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const updateLumpyEvent = useSimStore((state) => state.updateLumpyEvent);
   const removeLumpyEvent = useSimStore((state) => state.removeLumpyEvent);
   const investable = getInvestableAssets(inputs);
-  const gross = investable + inputs.illiquidAssets;
-  const liquidPct = gross > 0 ? (investable / gross) * 100 : 0;
+  const totalNW = getTotalNetWorth(inputs);
 
   return (
-    <aside className={`${mobile ? "max-h-[72vh]" : "h-[calc(100vh-76px)] lg:sticky lg:top-[76px]"} overflow-y-auto border-r border-border bg-sidebar p-4`}>
-      <Accordion type="multiple" defaultValue={["you", "assets", "spending", "market"]} className="grid gap-2">
-        <AccordionItem value="you" className="rounded-lg border border-border px-3">
+    <aside className={`${mobile ? "max-h-[85vh]" : "h-[calc(100vh-56px)] lg:sticky lg:top-[56px]"} sidebar-scroll flex flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)]`}>
+      <div className="flex-1 overflow-y-auto p-5 pb-32">
+        <div className="mb-8">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-muted)] mb-4">Quick Start</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {PRESETS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setInputs(p.inputs)}
+                className={cn(
+                  "flex flex-col items-start rounded-xl border p-3 text-left transition-all hover:bg-[var(--bg-card-hover)]",
+                  JSON.stringify(inputs).slice(0, 100) === JSON.stringify(p.inputs).slice(0, 100) 
+                    ? "border-[var(--accent)] bg-[var(--accent-glow)] shadow-[0_0_0_1px_var(--accent)]" 
+                    : "border-[var(--border)] bg-[var(--bg-card)]"
+                )}
+              >
+                <span className="text-xl mb-1">{p.emoji}</span>
+                <span className="text-[13px] font-bold text-[var(--text-primary)]">{p.name}</span>
+                <span className="text-[10px] text-[var(--text-muted)] line-clamp-1">{p.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <Accordion type="multiple" defaultValue={["you", "assets"]} className="grid gap-3">
+          <AccordionItem value="you" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4 card-noise">
           <AccordionTrigger>You & Your Spouse <Chip>Retire {inputs.retirementAge}</Chip></AccordionTrigger>
           <AccordionContent className="grid gap-4">
             <AgeInput label="Your current age" value={inputs.currentAge} min={30} max={70} error={errors.currentAge} onChange={(value) => setInput("currentAge", value)} />
