@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Slider } from "@/components/ui/slider"; 
-import { formatCompactCurrency, formatPercentage } from "@/lib/formatters";
-import { useSimStore } from "@/store/useSimStore";
-import { cn } from "@/lib/utils";
+import { Slider } from "../../components/ui/slider"; 
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+import { cn } from "../../lib/utils";
 
 interface SliderInputProps {
   label: string;

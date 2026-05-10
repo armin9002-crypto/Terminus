@@ -1,4 +1,4 @@
-import type { SimInputs } from "@/types";
+import type { SimInputs } from "../types";
 
 export const DEFAULT_INPUTS: SimInputs = {
   currentAge: 47,

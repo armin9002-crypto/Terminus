@@ -1,6 +1,6 @@
-import { SSA_MORTALITY_QX } from "@/lib/constants";
-import { formatCompactCurrency, formatPercentage } from "@/lib/formatters";
-import type { CollegeEvent, LumpyEvent, PercentilesAtAge, SimInputs, SimResults, StackedBandDataPoint, StressScenario } from "@/types";
+import { SSA_MORTALITY_QX } from "../lib/constants";
+import { formatCompactCurrency, formatPercentage } from "../lib/formatters";
+import type { CollegeEvent, LumpyEvent, PercentilesAtAge, SimInputs, SimResults, StackedBandDataPoint, StressScenario } from "../types";
 import { getSpendingForAge } from "./spendingSmile";
 
 function randomNormal(): number {

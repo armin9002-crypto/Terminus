@@ -1,10 +1,10 @@
 import { HelpCircle, Menu, Share2, X } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatCompactCurrency } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
-import { useSimStore } from "@/store/useSimStore";
+import { Button } from "../../components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
+import { formatCompactCurrency } from "../../lib/formatters";
+import { cn } from "../../lib/utils";
+import { useSimStore } from "../../store/useSimStore";
 import { MainPanel } from "./MainPanel";
 import { Sidebar } from "./Sidebar";
 

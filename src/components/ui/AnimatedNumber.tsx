@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { formatCompactCurrency, formatPercentage, formatMillions } from '@/lib/formatters';
+import { formatCompactCurrency, formatPercentage, formatMillions } from '../../lib/formatters';
 
 interface AnimatedNumberProps {
   value: number;

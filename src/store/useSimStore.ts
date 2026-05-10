@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import { runSimulation } from "@/engine/monteCarlo";
-import { DEFAULT_INPUTS } from "@/lib/constants";
-import type { InputErrors, LumpyEvent, Scenario, SimInputs, SimResults } from "@/types";
+import { runSimulation } from "../engine/monteCarlo";
+import { DEFAULT_INPUTS } from "../lib/constants";
+import type { InputErrors, LumpyEvent, Scenario, SimInputs, SimResults } from "../types";
 
 interface SimStore {
   inputs: SimInputs;
@@ -64,6 +64,52 @@ function scheduleRun(get: () => SimStore, set: (partial: Partial<SimStore>) => v
     set({ results: runSimulation(get().inputs), isRunning: false });
   }, 400);
 }
+
+export const useSimStore = create<SimStore>((set, get) => {
+  const initialErrors = validateInputs(DEFAULT_INPUTS);
+  return {
+    inputs: DEFAULT_INPUTS,
+    results: hasErrors(initialErrors) ? null : runSimulation(DEFAULT_INPUTS),
+    scenarios: [],
+    isRunning: false,
+    errors: initialErrors,
+    setInput: (key, value) => {
+      set((state) => ({ inputs: { ...state.inputs, [key]: value } }));
+      scheduleRun(get, set);
+    },
+    setInputs: (nextInputs) => {
+      set((state) => ({ inputs: { ...state.inputs, ...nextInputs } }));
+      scheduleRun(get, set);
+    },
+    runSimulation: () => {
+      const errors = validateInputs(get().inputs);
+      if (hasErrors(errors)) {
+        set({ errors, isRunning: false });
+        return;
+      }
+      set({ errors, isRunning: true });
+      set({ results: runSimulation(get().inputs), isRunning: false });
+    },
+    addScenario: (scenario) => set((state) => ({ scenarios: [...state.scenarios, scenario] })),
+    addLumpyEvent: (event) => {
+      set((state) => ({ inputs: { ...state.inputs, lumpyEvents: [...state.inputs.lumpyEvents, event] } }));
+      scheduleRun(get, set);
+    },
+    updateLumpyEvent: (event) => {
+      set((state) => ({
+        inputs: {
+          ...state.inputs,
+          lumpyEvents: state.inputs.lumpyEvents.map((item) => (item.id === event.id ? event : item)),
+        },
+      }));
+      scheduleRun(get, set);
+    },
+    removeLumpyEvent: (id) => {
+      set((state) => ({ inputs: { ...state.inputs, lumpyEvents: state.inputs.lumpyEvents.filter((event) => event.id !== id) } }));
+      scheduleRun(get, set);
+    },
+  };
+});
 
 export const useSimStore = create<SimStore>((set, get) => {
   const initialErrors = validateInputs(DEFAULT_INPUTS);

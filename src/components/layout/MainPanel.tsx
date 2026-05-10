@@ -1,16 +1,16 @@
 import { PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
-import { RichBrokeDeadChart } from "@/components/charts/RichBrokeDeadChart";
-import { ScenarioCompareChart } from "@/components/charts/ScenarioCompareChart";
-import { SpendingSmileChart } from "@/components/charts/SpendingSmileChart";
-import { StressTestChart } from "@/components/charts/StressTestChart";
-import { WealthFanChart } from "@/components/charts/WealthFanChart";
-import { HeroVerdict } from "@/components/dashboard/HeroVerdict";
-import { NetWorthSnapshot } from "@/components/dashboard/NetWorthSnapshot";
-import { StatCard } from "@/components/dashboard/StatCard";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatCompactCurrency, formatPercentage } from "@/lib/formatters";
-import { useSimStore } from "@/store/useSimStore";
+import { RichBrokeDeadChart } from "../../components/charts/RichBrokeDeadChart";
+import { ScenarioCompareChart } from "../../components/charts/ScenarioCompareChart";
+import { SpendingSmileChart } from "../../components/charts/SpendingSmileChart";
+import { StressTestChart } from "../../components/charts/StressTestChart";
+import { WealthFanChart } from "../../components/charts/WealthFanChart";
+import { HeroVerdict } from "../../components/dashboard/HeroVerdict";
+import { NetWorthSnapshot } from "../../components/dashboard/NetWorthSnapshot";
+import { StatCard } from "../../components/dashboard/StatCard";
+import { Card, CardContent, CardHeader } from "../../components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
 
 function ruinTone(ruinProbability: number) {
   if (ruinProbability > 0.2) return "danger";
