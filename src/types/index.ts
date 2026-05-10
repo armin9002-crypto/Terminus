@@ -35,6 +35,11 @@ export interface SimInputs {
   mortgageAnnualPayment: number;
   mortgageYearsRemaining: number;
   capitalCallObligations: number;
+  filingStatus: 'mfj' | 'single';
+  numDependents: number;
+  stateIncomeTaxRate: number;
+  preTaxSavingsRate: number;
+  afterTaxSavingsRate: number;
 }
 
 export interface LumpyEvent {
