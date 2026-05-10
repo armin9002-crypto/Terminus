@@ -1,4 +1,4 @@
-import type { LumpyEvent } from "@/types";
+import type { LumpyEvent } from "../types";
 
 export function estimateEventTax(event: LumpyEvent): number {
   if (event.taxType === "ordinary") {

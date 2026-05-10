@@ -40,6 +40,15 @@ export const DEFAULT_INPUTS: SimInputs = {
       taxType: "ltcg",
       confidence: "medium",
     },
+    {
+      id: "capital-call-1",
+      label: "Capital Call",
+      year: 48,
+      amount: -250000,
+      probability: 1,
+      taxType: "none",
+      confidence: "high",
+    },
   ],
   numKids: 2,
   collegeEvents: [

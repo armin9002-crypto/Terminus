@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { runSimulation, solveSustainableSpend } from "../../engine/monteCarlo";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
 import { useSimStore } from "../../store/useSimStore";
+import type { PercentilesAtAge, SimResults } from "../../types";
 
 const scenarios = [
   { name: "Retire at 52", retirementAge: 52, color: "#14b8a6" },
@@ -10,22 +11,66 @@ const scenarios = [
   { name: "Retire at 58", retirementAge: 58, color: "#f59e0b" },
 ];
 
+interface ScenarioResult {
+  name: string;
+  retirementAge: number;
+  color: string;
+  result: SimResults;
+  monthlySpend: number;
+}
+
 export function ScenarioCompareChart() {
   const inputs = useSimStore((state) => state.inputs);
   const [noCarry, setNoCarry] = useState(false);
-  const scenarioResults = useMemo(() => {
+  const [scenarioResults, setScenarioResults] = useState<ScenarioResult[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
     const baseInputs = noCarry ? { ...inputs, lumpyEvents: [] } : inputs;
-    return scenarios.map((scenario) => {
-      const result = runSimulation({ ...baseInputs, retirementAge: scenario.retirementAge, numSimulations: Math.min(baseInputs.numSimulations, 1000) });
-      return { ...scenario, result, monthlySpend: solveSustainableSpend({ ...baseInputs, retirementAge: scenario.retirementAge }) };
-    });
+    const reducedInputs = { ...baseInputs, numSimulations: Math.min(baseInputs.numSimulations, 750) };
+    
+    let index = 0;
+    const finalResults: ScenarioResult[] = [];
+
+    function runNext() {
+      if (index >= scenarios.length) {
+        setScenarioResults(finalResults);
+        setLoading(false);
+        return;
+      }
+
+      const scenario = scenarios[index];
+      const result = runSimulation({ ...reducedInputs, retirementAge: scenario.retirementAge });
+      const monthlySpend = solveSustainableSpend({ ...reducedInputs, retirementAge: scenario.retirementAge });
+      
+      finalResults.push({ ...scenario, result, monthlySpend });
+      index++;
+      setTimeout(runNext, 0);
+    }
+
+    setTimeout(runNext, 0);
   }, [inputs, noCarry]);
-  const chartData = scenarioResults[0]?.result.percentilePaths.map((point, index) => ({
+
+  const chartData = scenarioResults[0]?.result?.percentilePaths?.map((point: PercentilesAtAge, index: number) => ({
     age: point.age,
     retire52: scenarioResults[0]?.result.percentilePaths[index]?.p50 ?? 0,
     retire55: scenarioResults[1]?.result.percentilePaths[index]?.p50 ?? 0,
     retire58: scenarioResults[2]?.result.percentilePaths[index]?.p50 ?? 0,
   })) ?? [];
+
+  if (loading) {
+    return (
+      <div className="grid gap-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="h-32 animate-pulse rounded-lg bg-slate-700/30" />
+          <div className="h-32 animate-pulse rounded-lg bg-slate-700/30" />
+          <div className="h-32 animate-pulse rounded-lg bg-slate-700/30" />
+        </div>
+        <p className="text-center text-sm text-[var(--text-muted)]">Computing scenarios...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4">

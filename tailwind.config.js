@@ -5,16 +5,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "#0f1117",
-        sidebar: "#161b27",
-        card: "#1a2035",
-        border: "#2d3748",
-        accent: "#14b8a6",
-        success: "#22c55e",
-        warning: "#f59e0b",
-        danger: "#ef4444",
-        primaryText: "#f1f5f9",
-        mutedText: "#94a3b8",
+        border: "var(--border)",
+        background: "var(--bg-primary)",
+        card: "var(--bg-card)",
+        sidebar: "var(--bg-secondary)",
+        accent: "var(--accent)",
+        success: "var(--success)",
+        warning: "var(--warning)",
+        danger: "var(--danger)",
+        primaryText: "var(--text-primary)",
+        mutedText: "var(--text-muted)",
+        secondaryText: "var(--text-secondary)",
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],

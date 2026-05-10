@@ -1,6 +1,6 @@
 import { Area, CartesianGrid, ComposedChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { StackedBandDataPoint } from "@/types";
-import { useSimStore } from "@/store/useSimStore";
+import type { StackedBandDataPoint } from "../../types";
+import { useSimStore } from "../../store/useSimStore";
 
 const bands = [
   { key: "broke", label: "Broke", color: "#dc2626" },
@@ -33,7 +33,13 @@ export function RichBrokeDeadChart() {
   const inputs = useSimStore((state) => state.inputs);
   const results = useSimStore((state) => state.results);
   const isRunning = useSimStore((state) => state.isRunning);
-  const data: StackedBandDataPoint[] = results?.stackedBands ?? [];
+  
+  const allBands: StackedBandDataPoint[] = results?.stackedBands ?? [];
+  const data = allBands.filter(d => d.age >= inputs.retirementAge);
+
+  const retirementAge = inputs.retirementAge;
+  const midAge = Math.round((inputs.retirementAge + inputs.planningAge) / 2);
+  const midPoint = data.find(d => d.age === midAge);
 
   if (isRunning) {
     return (
@@ -60,13 +66,37 @@ export function RichBrokeDeadChart() {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex flex-wrap gap-3 text-xs text-mutedText">
-        {bands.map((band) => (
-          <span key={band.key} className="inline-flex items-center gap-2">
-            <span className="size-3 rounded-sm" style={{ backgroundColor: band.color }} />
-            {band.label}
-          </span>
-        ))}
+      <div className="grid gap-3">
+        {/* Color legend row */}
+        <div className="flex flex-wrap gap-4">
+          {bands.map(band => (
+            <span key={band.key} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+              <span className="h-3 w-3 rounded-sm" style={{backgroundColor: band.color}} />
+              {band.label}
+            </span>
+          ))}
+        </div>
+
+        {/* Mid-retirement snapshot */}
+        {midPoint && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">
+              At age {midAge} (mid-retirement snapshot)
+            </p>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {bands.map(band => (
+                <div key={band.key} className="text-center">
+                  <p className="text-lg font-bold" style={{color: band.color}}>
+                    {(midPoint[band.key as keyof StackedBandDataPoint] as number).toFixed(0)}%
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)]">
+                    {band.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

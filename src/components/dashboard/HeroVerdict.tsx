@@ -1,4 +1,5 @@
-import { getInvestableAssets } from "../../engine/monteCarlo";
+import { useState, useEffect } from "react";
+import { getInvestableAssets, solveSustainableSpend } from "../../engine/monteCarlo";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
 import { cn } from "../../lib/utils";
 import type { SimInputs, SimResults } from "../../types";
@@ -17,6 +18,20 @@ function tone(successRate: number) {
 export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
   const successRate = results?.successRate;
   const activeTone = tone(successRate ?? 0);
+  
+  const [sustainableSpend, setSustainableSpend] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!results) {
+      setSustainableSpend(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const spend = solveSustainableSpend(inputs);
+      setSustainableSpend(spend);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [results?.successRate, inputs.retirementAge, inputs.planningAge, inputs.taxableAssets, inputs.taxDeferredAssets, inputs.taxFreeAssets]);
 
   return (
     <section className={cn("min-h-[120px] rounded-lg border border-border border-l-4 bg-card p-5 shadow-terminal", activeTone.border)}>
@@ -30,6 +45,10 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
             </span>{" "}
             confidence through age {inputs.planningAge}
           </h1>
+          <p className="mt-2 text-sm font-semibold" style={{color: 'var(--accent)'}}>
+            Safe sustainable spend at 85% confidence: 
+            {sustainableSpend ? `${formatCompactCurrency(sustainableSpend * 12)}/year · ${formatCompactCurrency(sustainableSpend)}/month` : "--"}
+          </p>
           <p className="mt-3 text-sm text-mutedText">
             Retiring at {inputs.retirementAge} / {formatCompactCurrency(getInvestableAssets(inputs))} investable /{" "}
             {inputs.numSimulations.toLocaleString()} simulations / Live model

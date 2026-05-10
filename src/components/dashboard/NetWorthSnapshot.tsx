@@ -1,7 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { getInvestableAssets } from "@/engine/monteCarlo";
-import { formatCompactCurrency } from "@/lib/formatters";
-import type { SimInputs } from "@/types";
+import { getInvestableAssets } from "../../engine/monteCarlo";
+import { formatCompactCurrency } from "../../lib/formatters";
+import type { SimInputs } from "../../types";
 
 interface NetWorthSnapshotProps {
   inputs: SimInputs;

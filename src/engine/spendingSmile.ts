@@ -1,4 +1,4 @@
-import type { SimInputs } from "@/types";
+import type { SimInputs } from "../types";
 
 export function getSpendingForAge(age: number, retirementAge: number, inputs: SimInputs): number {
   if (age < retirementAge) {

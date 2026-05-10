@@ -1,5 +1,6 @@
 import { HelpCircle, Menu, Share2, X } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "../../lib/useTheme";
 import { Button } from "../../components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { formatCompactCurrency } from "../../lib/formatters";
@@ -11,18 +12,43 @@ import { Sidebar } from "./Sidebar";
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState(false);
+  const { theme, setTheme } = useTheme();
   const isRunning = useSimStore((state) => state.isRunning);
   const numSimulations = useSimStore((state) => state.inputs.numSimulations);
+  const resetInputs = useSimStore(state => state.resetInputs);
 
   return (
     <div className="min-h-screen bg-background text-primaryText">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-xl">
-        <div className="flex h-[76px] items-center justify-between px-4 lg:px-6">
+        <div className="flex h-[56px] items-center justify-between px-4 lg:px-6">
           <div>
             <p className="bg-gradient-to-r from-teal-400 to-blue-400 bg-clip-text text-lg font-extrabold uppercase tracking-widest text-transparent">Terminus</p>
-            <p className="mt-1 text-xs text-mutedText">Private Wealth Simulation</p>
           </div>
+
+          <div className="hidden items-center gap-1 md:flex">
+            {(['dark', 'light', 'sepia'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                  theme === t 
+                    ? 'bg-[var(--accent)] text-white' 
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {t === 'dark' ? '🌙 Dark' : t === 'light' ? '☀️ Light' : '📜 Sepia'}
+              </button>
+            ))}
+          </div>
+
           <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              className="text-xs px-2 h-7"
+              onClick={resetInputs}>
+              Reset
+            </Button>
+
             <div className="hidden items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 sm:flex">
               <span className={cn("size-2 rounded-full bg-emerald-400", isRunning && "animate-pulse")} />
               Live Model

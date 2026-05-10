@@ -16,6 +16,29 @@ interface SimStore {
   addLumpyEvent: (event: LumpyEvent) => void;
   updateLumpyEvent: (event: LumpyEvent) => void;
   removeLumpyEvent: (id: string) => void;
+  resetInputs: () => void;
+}
+
+const STORAGE_KEY = 'terminus-inputs-v1';
+
+function loadSavedInputs(): SimInputs {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return DEFAULT_INPUTS;
+    const parsed = JSON.parse(saved);
+    // Merge with defaults to handle new fields added in updates
+    return { ...DEFAULT_INPUTS, ...parsed };
+  } catch {
+    return DEFAULT_INPUTS;
+  }
+}
+
+function saveInputs(inputs: SimInputs): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(inputs));
+  } catch {
+    // Storage full or unavailable — fail silently
+  }
 }
 
 let debounceTimer: number | null = null;
@@ -59,6 +82,7 @@ function scheduleRun(get: () => SimStore, set: (partial: Partial<SimStore>) => v
   }
 
   set({ isRunning: true });
+  saveInputs(get().inputs);
   if (debounceTimer) window.clearTimeout(debounceTimer);
   debounceTimer = window.setTimeout(() => {
     set({ results: runSimulation(get().inputs), isRunning: false });
@@ -66,18 +90,19 @@ function scheduleRun(get: () => SimStore, set: (partial: Partial<SimStore>) => v
 }
 
 export const useSimStore = create<SimStore>((set, get) => {
-  const initialErrors = validateInputs(DEFAULT_INPUTS);
+  const initialInputs = loadSavedInputs();
+  const initialErrors = validateInputs(initialInputs);
   return {
-    inputs: DEFAULT_INPUTS,
-    results: hasErrors(initialErrors) ? null : runSimulation(DEFAULT_INPUTS),
+    inputs: initialInputs,
+    results: hasErrors(initialErrors) ? null : runSimulation(initialInputs),
     scenarios: [] as Scenario[],
     isRunning: false,
     errors: initialErrors,
-    setInput: (key, value) => {
+    setInput: <K extends keyof SimInputs>(key: K, value: SimInputs[K]) => {
       set((state) => ({ inputs: { ...state.inputs, [key]: value } }));
       scheduleRun(get, set);
     },
-    setInputs: (nextInputs) => {
+    setInputs: (nextInputs: Partial<SimInputs>) => {
       set((state) => ({ inputs: { ...state.inputs, ...nextInputs } }));
       scheduleRun(get, set);
     },
@@ -114,5 +139,10 @@ export const useSimStore = create<SimStore>((set, get) => {
       }));
       scheduleRun(get, set);
     },
+    resetInputs: () => {
+      localStorage.removeItem(STORAGE_KEY);
+      set({ inputs: DEFAULT_INPUTS });
+      scheduleRun(get, set);
+    }
   };
 });

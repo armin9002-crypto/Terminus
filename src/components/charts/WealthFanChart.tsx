@@ -5,15 +5,16 @@ import {
   Legend,
   Line,
   ReferenceLine,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { Slider } from "@/components/ui/slider";
-import { formatCompactCurrency, formatMillions } from "@/lib/formatters";
-import { useSimStore } from "@/store/useSimStore";
-import type { PercentilesAtAge } from "@/types";
+import { Slider } from "../../components/ui/slider";
+import { formatCompactCurrency, formatMillions } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+import type { PercentilesAtAge } from "../../types";
 
 interface ChartDatum extends PercentilesAtAge {
   p10p90: [number, number];
@@ -33,6 +34,18 @@ export function WealthFanChart() {
   const results = useSimStore((state) => state.results);
   const setInput = useSimStore((state) => state.setInput);
   const isRunning = useSimStore((state) => state.isRunning);
+
+  const retirementIndex = results?.percentilePaths
+    .findIndex(p => p.age === inputs.retirementAge) ?? -1;
+  const retirePlusFive = results?.percentilePaths
+    .find(p => p.age === inputs.retirementAge + 5);
+  const retirePoint = results?.percentilePaths
+    .find(p => p.age === inputs.retirementAge);
+  
+  const sequenceRisk = retirePoint && retirePlusFive && retirePoint.p10 > 0
+    ? (retirePlusFive.p10 - retirePoint.p10) / retirePoint.p10
+    : 0;
+
   const data = chartData(results?.percentilePaths ?? []);
 
   if (isRunning) {
@@ -133,6 +146,20 @@ export function WealthFanChart() {
           onValueChange={([value]) => setInput("retirementAge", value ?? inputs.retirementAge)}
         />
       </div>
+      {sequenceRisk < -0.25 && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm">
+          <span className="font-bold text-red-300">
+            ⚠️ Sequence of Returns Risk Detected
+          </span>
+          <p className="mt-1 text-[var(--text-muted)]">
+            In the worst 10% of scenarios, your portfolio drops 
+            {Math.abs(sequenceRisk * 100).toFixed(0)}% in the 
+            first 5 years of retirement. A market downturn early 
+            in retirement is especially damaging — consider 
+            maintaining 2 years of cash reserves as a buffer.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

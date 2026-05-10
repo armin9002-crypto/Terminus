@@ -1,5 +1,5 @@
-import { formatPercentage } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
+import { formatPercentage } from "../../lib/formatters";
+import { cn } from "../../lib/utils";
 
 interface ProbabilityGaugeProps {
   value: number;

@@ -1,5 +1,63 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
+:root,
+:root[data-theme="dark"] {
+  --bg-primary: #0f1117;
+  --bg-secondary: #161b27;
+  --bg-card: #1a2035;
+  --bg-card-hover: #1f2845;
+  --border: #2d3748;
+  --border-subtle: #1e2a3a;
+  --accent: #14b8a6;
+  --accent-glow: rgba(20, 184, 166, 0.15);
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --scrollbar-thumb: #2d3748;
+  --noise-opacity: 0.03;
+}
+
+:root[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --accent: #0d9488;
+  --accent-glow: rgba(13, 148, 136, 0.10);
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #94a3b8;
+  --scrollbar-thumb: #cbd5e1;
+  --noise-opacity: 0.02;
+}
+
+:root[data-theme="sepia"] {
+  --bg-primary: #1c1510;
+  --bg-secondary: #241d16;
+  --bg-card: #2a211a;
+  --bg-card-hover: #322820;
+  --border: #4a3728;
+  --border-subtle: #3a2d22;
+  --accent: #d4956a;
+  --accent-glow: rgba(212, 149, 106, 0.15);
+  --success: #7fb069;
+  --warning: #e8a838;
+  --danger: #c94040;
+  --text-primary: #f5e6d3;
+  --text-secondary: #d4b896;
+  --text-muted: #8a7260;
+  --scrollbar-thumb: #4a3728;
+  --noise-opacity: 0.04;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,6 +71,9 @@
 
 * {
   box-sizing: border-box;
+  transition: background-color 0.3s ease, 
+              color 0.3s ease, 
+              border-color 0.3s ease;
 }
 
 body {
@@ -41,4 +102,18 @@ input[type="number"] {
 
 ::selection {
   background: rgba(20, 184, 166, 0.32);
+}
+
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { 
+  background: var(--scrollbar-thumb); 
+  border-radius: 2px; 
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover { 
+  background: var(--accent); 
+}
+.sidebar-scroll { 
+  scrollbar-width: thin; 
+  scrollbar-color: var(--scrollbar-thumb) transparent; 
 }

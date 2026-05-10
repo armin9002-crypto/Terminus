@@ -104,22 +104,27 @@ export function computeStackedBands(
   return firstPath.map((_, index) => {
     const age = currentAge + index;
     const values = paths.map((path) => path[index] ?? 0);
+    
+    const total = paths.length;
+    const brokeCount = values.filter(v => v <= 0).length;
+    const strugglingCount = values.filter(v => v > 0 && v <= startingAssets * 0.5).length;
+    const survivingCount = values.filter(v => v > startingAssets * 0.5 && v <= startingAssets).length;
+    const thrivingCount = values.filter(v => v > startingAssets && v <= startingAssets * 2).length;
+    const flourishingCount = values.filter(v => v > startingAssets * 2).length;
+
     const dead = age >= retirementAge ? getCumulativeMortality(retirementAge, age) : 0;
-    const aliveShare = Math.max(0, 100 - dead);
-    const denominator = Math.max(1, paths.length);
-    const brokeRaw = values.filter((value) => value <= 0).length / denominator;
-    const strugglingRaw = values.filter((value) => value > 0 && value <= startingAssets * 0.5).length / denominator;
-    const survivingRaw = values.filter((value) => value > startingAssets * 0.5 && value <= startingAssets).length / denominator;
-    const thrivingRaw = values.filter((value) => value > startingAssets && value <= startingAssets * 2).length / denominator;
-    const flourishingRaw = values.filter((value) => value > startingAssets * 2).length / denominator;
+    const livingPct = Math.max(0, 100 - dead);
+
+    const livingTotal = brokeCount + strugglingCount + survivingCount + thrivingCount + flourishingCount;
+    const scale = livingTotal > 0 ? livingPct / 100 : 0;
 
     return {
       age,
-      broke: brokeRaw * aliveShare,
-      struggling: strugglingRaw * aliveShare,
-      surviving: survivingRaw * aliveShare,
-      thriving: thrivingRaw * aliveShare,
-      flourishing: flourishingRaw * aliveShare,
+      broke: (brokeCount / total) * 100 * scale,
+      struggling: (strugglingCount / total) * 100 * scale,
+      surviving: (survivingCount / total) * 100 * scale,
+      thriving: (thrivingCount / total) * 100 * scale,
+      flourishing: (flourishingCount / total) * 100 * scale,
       dead,
       p10: percentile(values, 10),
       p25: percentile(values, 25),
@@ -132,6 +137,17 @@ export function computeStackedBands(
 
 function buildVerdict(inputs: SimInputs, successRate: number): string {
   return `Based on your inputs, you can sustain ${formatCompactCurrency(inputs.spendingGoGo)}/year with ${formatPercentage(successRate, 0)} confidence through age ${inputs.planningAge}`;
+}
+
+function estimateEffectiveTaxRate(grossIncome: number): number {
+  // 2024 MFJ brackets (simplified)
+  if (grossIncome <= 23200) return 0.10;
+  if (grossIncome <= 94300) return 0.12;
+  if (grossIncome <= 201050) return 0.22;
+  if (grossIncome <= 383900) return 0.24;
+  if (grossIncome <= 487450) return 0.32;
+  if (grossIncome <= 731200) return 0.35;
+  return 0.37;
 }
 
 export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario): SimResults {
@@ -166,8 +182,12 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
         annualGrossIncome += socialSecurityIncome(age, inputs);
         annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, yearIndex) : 0;
         
-        // Apply a basic tax estimate to income (assuming 25% effective rate for simplicity)
-        wealth += annualGrossIncome * 0.75;
+        // Progressive federal tax estimate (MFJ 2024 brackets)
+        // Does not include state tax, FICA, or Medicare surtax
+        // Carried interest distributions handled separately in 
+        // taxableEventAmount() at LTCG rates
+        const effectiveRate = estimateEffectiveTaxRate(annualGrossIncome);
+        wealth += annualGrossIncome * (1 - effectiveRate);
         
         wealth += lumpyEventCashFlow(age, inputs.lumpyEvents);
         wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);

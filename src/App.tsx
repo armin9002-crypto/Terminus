@@ -1,5 +1,5 @@
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AppShell } from "@/components/layout/AppShell";
+import { TooltipProvider } from "./components/ui/tooltip";
+import { AppShell } from "./components/layout/AppShell";
 
 export function App() {
   return (

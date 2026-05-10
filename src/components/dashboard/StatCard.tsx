@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Line, LineChart, ReferenceLine, ResponsiveContainer } from "recharts";
+import { Card, CardContent } from "../../components/ui/card";
+import { cn } from "../../lib/utils";
 
 interface StatCardProps {
   icon: LucideIcon;
@@ -8,6 +9,8 @@ interface StatCardProps {
   value: string;
   description: string;
   tone?: "success" | "warning" | "danger" | "neutral";
+  sparklineData?: number[];
+  sparklineColor?: string;
 }
 
 const toneClass = {
@@ -17,7 +20,7 @@ const toneClass = {
   neutral: "text-primaryText",
 };
 
-export function StatCard({ icon: Icon, label, value, description, tone = "neutral" }: StatCardProps) {
+export function StatCard({ icon: Icon, label, value, description, tone = "neutral", sparklineData, sparklineColor }: StatCardProps) {
   return (
     <Card className="shadow-none">
       <CardContent className="p-4">
@@ -31,6 +34,23 @@ export function StatCard({ icon: Icon, label, value, description, tone = "neutra
           </div>
         </div>
         <p className="mt-3 text-sm leading-5 text-mutedText">{description}</p>
+        {sparklineData && sparklineData.length > 0 && (
+          <div className="mt-3 h-10 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={sparklineData.map((v, i) => ({ i, v }))}>
+                <Line 
+                  type="monotone" 
+                  dataKey="v" 
+                  stroke={sparklineColor ?? 'var(--accent)'} 
+                  strokeWidth={1.5} 
+                  dot={false} 
+                  isAnimationActive={false}
+                />
+                <ReferenceLine y={0} stroke="#ef4444" strokeOpacity={0.4} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
