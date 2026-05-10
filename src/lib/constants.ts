@@ -15,10 +15,10 @@ export const DEFAULT_INPUTS: SimInputs = {
   cashReserves: 350_000,
   annualSalary: 650_000,
   spouseAnnualSalary: 225_000,
-  socialSecurityAge: 67,
-  socialSecurityAmount: 48_000,
+  socialSecurityAge: 67,         // FRA for born 1960+
+  socialSecurityAmount: 48000,   // $4,000/month × 12
   spouseSocialSecurityAge: 67,
-  spouseSocialSecurityAmount: 32_000,
+  spouseSocialSecurityAmount: 32400,  // $2,700/month × 12
   otherRetirementIncome: 0,
   spendingGoGo: 280_000,
   spendingSlowGo: 200_000,
@@ -65,6 +65,11 @@ export const DEFAULT_INPUTS: SimInputs = {
   mortgageAnnualPayment: 96_000,
   mortgageYearsRemaining: 12,
   capitalCallObligations: 80_000,
+  filingStatus: 'mfj',
+  numDependents: 2,
+  stateIncomeTaxRate: 0.093,
+  preTaxSavingsRate: 0.15,
+  afterTaxSavingsRate: 0.20,
 };
 
 export const HISTORICAL_SCENARIOS = [
@@ -74,6 +79,13 @@ export const HISTORICAL_SCENARIOS = [
 ];
 
 export const SSA_MORTALITY_QX: Record<number, number> = {
+  18: 0.0008, 19: 0.0009, 20: 0.0010, 21: 0.0011, 22: 0.0011,
+  23: 0.0011, 24: 0.0011, 25: 0.0011, 26: 0.0012, 27: 0.0012,
+  28: 0.0013, 29: 0.0013, 30: 0.0014, 31: 0.0014, 32: 0.0015,
+  33: 0.0016, 34: 0.0017, 35: 0.0018, 36: 0.0019, 37: 0.0021,
+  38: 0.0022, 39: 0.0024, 40: 0.0026, 41: 0.0028, 42: 0.0031,
+  43: 0.0033, 44: 0.0036, 45: 0.0040, 46: 0.0043, 47: 0.0047,
+  48: 0.0052, 49: 0.0057,
   50: 0.0044, 51: 0.0048, 52: 0.0053, 53: 0.0058, 54: 0.0064,
   55: 0.0071, 56: 0.0078, 57: 0.0086, 58: 0.0095, 59: 0.0105,
   60: 0.0116, 61: 0.0128, 62: 0.0141, 63: 0.0156, 64: 0.0172,

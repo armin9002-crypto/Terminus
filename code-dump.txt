@@ -1,0 +1,2846 @@
+﻿// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\ProbabilityGauge.tsx
+import { formatPercentage } from "../../lib/formatters";
+import { cn } from "../../lib/utils";
+
+interface ProbabilityGaugeProps {
+  value: number;
+}
+
+export function ProbabilityGauge({ value }: ProbabilityGaugeProps) {
+  const tone = value > 0.85 ? "text-success" : value >= 0.7 ? "text-warning" : "text-danger";
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - value);
+
+  return (
+    <div className="grid place-items-center">
+      <div className="relative size-36">
+        <svg viewBox="0 0 120 120" className="-rotate-90">
+          <circle cx="60" cy="60" r={radius} stroke="#2d3748" strokeWidth="10" fill="none" />
+          <circle
+            cx="60"
+            cy="60"
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="10"
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className={cn("transition-all duration-500", tone)}
+          />
+        </svg>
+        <div className="absolute inset-0 grid place-items-center text-center">
+          <div>
+            <p className={cn("text-2xl font-bold", tone)}>{formatPercentage(value, 0)}</p>
+            <p className="text-xs text-mutedText">success</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\RichBrokeDeadChart.tsx
+import { Area, CartesianGrid, ComposedChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import type { StackedBandDataPoint } from "../../types";
+import { useSimStore } from "../../store/useSimStore";
+
+const bands = [
+  { key: "broke", label: "Broke", color: "#dc2626" },
+  { key: "struggling", label: "Struggling", color: "#ea580c" },
+  { key: "surviving", label: "Surviving", color: "#ca8a04" },
+  { key: "thriving", label: "Thriving", color: "#16a34a" },
+  { key: "flourishing", label: "Flourishing", color: "#0d9488" },
+  { key: "dead", label: "Dead", color: "#475569" },
+] as const;
+
+function PercentTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey?: string; value?: number }>; label?: number }) {
+  if (!active || !payload) return null;
+  const values = new Map(payload.map((item) => [item.dataKey, Number(item.value ?? 0)]));
+  return (
+    <div className="rounded-lg border border-border bg-[#1e293b] p-3 text-sm text-primaryText shadow-xl">
+      <p className="font-semibold">Age {label}</p>
+      <div className="my-2 h-px bg-border" />
+      {[...bands].reverse().map((band) => (
+        <div key={band.key} className="grid grid-cols-[14px_1fr_auto] items-center gap-2 py-0.5">
+          <span className="size-3 rounded-sm" style={{ backgroundColor: band.color }} />
+          <span>{band.label}</span>
+          <span className="font-semibold">{(values.get(band.key) ?? 0).toFixed(0)}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function RichBrokeDeadChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const results = useSimStore((state) => state.results);
+  const isRunning = useSimStore((state) => state.isRunning);
+  
+  const allBands: StackedBandDataPoint[] = results?.stackedBands ?? [];
+  const data = allBands.filter(d => d.age >= inputs.retirementAge);
+
+  const retirementAge = inputs.retirementAge;
+  const midAge = Math.round((inputs.retirementAge + inputs.planningAge) / 2);
+  const midPoint = data.find(d => d.age === midAge);
+
+  if (isRunning) {
+    return (
+      <div className="h-[540px] animate-pulse rounded-lg border border-border bg-[#111827] p-6">
+        <div className="h-full rounded-md bg-slate-700/40" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="h-[540px] min-h-[360px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 24, right: 28, bottom: 12, left: 8 }}>
+            <CartesianGrid stroke="#2d3748" strokeOpacity={0.5} vertical={false} />
+            <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
+            <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} width={58} />
+            <Tooltip content={<PercentTooltip />} />
+            <ReferenceLine x={inputs.retirementAge} stroke="#f59e0b" strokeDasharray="5 5" label={{ value: "Retire", fill: "#f59e0b", position: "insideTopRight" }} />
+            <ReferenceLine x={inputs.socialSecurityAge} stroke="#38bdf8" strokeDasharray="5 5" label={{ value: "SS", fill: "#38bdf8", position: "insideTopRight" }} />
+            {bands.map((band) => (
+              <Area key={band.key} type="monotone" dataKey={band.key} stackId="a" stroke="none" fill={band.color} fillOpacity={band.key === "dead" ? 0.7 : 0.92} />
+            ))}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="grid gap-3">
+        {/* Color legend row */}
+        <div className="flex flex-wrap gap-4">
+          {bands.map(band => (
+            <span key={band.key} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+              <span className="h-3 w-3 rounded-sm" style={{backgroundColor: band.color}} />
+              {band.label}
+            </span>
+          ))}
+        </div>
+
+        {/* Mid-retirement snapshot */}
+        {midPoint && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">
+              At age {midAge} (mid-retirement snapshot)
+            </p>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {bands.map(band => (
+                <div key={band.key} className="text-center">
+                  <p className="text-lg font-bold" style={{color: band.color}}>
+                    {(midPoint[band.key as keyof StackedBandDataPoint] as number).toFixed(0)}%
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)]">
+                    {band.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\ScenarioCompareChart.tsx
+import { useState, useEffect } from "react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { runSimulation, solveSustainableSpend } from "../../engine/monteCarlo";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+import type { PercentilesAtAge, SimResults } from "../../types";
+
+const scenarios = [
+  { name: "Retire at 52", retirementAge: 52, color: "#14b8a6" },
+  { name: "Retire at 55", retirementAge: 55, color: "#22c55e" },
+  { name: "Retire at 58", retirementAge: 58, color: "#f59e0b" },
+];
+
+interface ScenarioResult {
+  name: string;
+  retirementAge: number;
+  color: string;
+  result: SimResults;
+  monthlySpend: number;
+}
+
+export function ScenarioCompareChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const [noCarry, setNoCarry] = useState(false);
+  const [scenarioResults, setScenarioResults] = useState<ScenarioResult[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const baseInputs = noCarry ? { ...inputs, lumpyEvents: [] } : inputs;
+    const reducedInputs = { ...baseInputs, numSimulations: Math.min(baseInputs.numSimulations, 750) };
+    
+    let index = 0;
+    const finalResults: ScenarioResult[] = [];
+
+    function runNext() {
+      if (index >= scenarios.length) {
+        setScenarioResults(finalResults);
+        setLoading(false);
+        return;
+      }
+
+      const scenario = scenarios[index];
+      const result = runSimulation({ ...reducedInputs, retirementAge: scenario.retirementAge });
+      const monthlySpend = solveSustainableSpend({ ...reducedInputs, retirementAge: scenario.retirementAge });
+      
+      finalResults.push({ ...scenario, result, monthlySpend });
+      index++;
+      setTimeout(runNext, 0);
+    }
+
+    setTimeout(runNext, 0);
+  }, [inputs, noCarry]);
+
+  const chartData = scenarioResults[0]?.result?.percentilePaths?.map((point: PercentilesAtAge, index: number) => ({
+    age: point.age,
+    retire52: scenarioResults[0]?.result.percentilePaths[index]?.p50 ?? 0,
+    retire55: scenarioResults[1]?.result.percentilePaths[index]?.p50 ?? 0,
+    retire58: scenarioResults[2]?.result.percentilePaths[index]?.p50 ?? 0,
+  })) ?? [];
+
+  if (loading) {
+    return (
+      <div className="grid gap-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="h-32 animate-pulse rounded-lg bg-slate-700/30" />
+          <div className="h-32 animate-pulse rounded-lg bg-slate-700/30" />
+          <div className="h-32 animate-pulse rounded-lg bg-slate-700/30" />
+        </div>
+        <p className="text-center text-sm text-[var(--text-muted)]">Computing scenarios...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-[#111827] p-3">
+        <span className="text-sm font-semibold text-primaryText">What if carry never comes?</span>
+        <button className="rounded-full border border-border px-3 py-1 text-sm text-mutedText" onClick={() => setNoCarry((value) => !value)}>
+          {noCarry ? "No carry" : "Base carry"}
+        </button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {scenarioResults.map((scenario) => (
+          <div key={scenario.name} className="rounded-lg border border-border bg-[#111827] p-4">
+            <p className="text-sm font-semibold text-primaryText">{scenario.name}</p>
+            <p className="mt-3 text-3xl font-bold" style={{ color: scenario.color }}>{formatPercentage(scenario.result.successRate, 0)}</p>
+            <p className="mt-1 text-xs text-mutedText">Success rate</p>
+            <div className="mt-4 grid gap-2 text-sm text-mutedText">
+              <span>Median terminal: <strong className="text-primaryText">{formatCompactCurrency(scenario.result.medianTerminalWealth)}</strong></span>
+              <span>85% monthly spend: <strong className="text-primaryText">{formatCompactCurrency(scenario.monthlySpend)}</strong></span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="h-[380px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 20, right: 24, bottom: 8, left: 8 }}>
+            <CartesianGrid stroke="#2d3748" strokeOpacity={0.5} vertical={false} />
+            <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
+            <YAxis tickFormatter={formatCompactCurrency} tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} width={78} />
+            <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid #2d3748", color: "#f1f5f9" }} formatter={(value) => formatCompactCurrency(Number(value))} />
+            <Line dataKey="retire52" name="Retire at 52" stroke="#14b8a6" strokeWidth={2} dot={false} />
+            <Line dataKey="retire55" name="Retire at 55" stroke="#22c55e" strokeWidth={2} dot={false} />
+            <Line dataKey="retire58" name="Retire at 58" stroke="#f59e0b" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\SpendingSmileChart.tsx
+import { Area, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, AreaChart, ReferenceArea, ReferenceLine } from "recharts";
+import { buildSpendingSmileSeries } from "../../engine/spendingSmile";
+import { formatCompactCurrency } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+
+export function SpendingSmileChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const data = buildSpendingSmileSeries(inputs);
+
+  return (
+    <div className="h-[420px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
+          <CartesianGrid stroke="#2d3748" strokeOpacity={0.55} vertical={false} />
+          <ReferenceArea 
+            x1={inputs.retirementAge} 
+            x2={inputs.retirementAge + inputs.goGoYears} 
+            fill="#22c55e" fillOpacity={0.06} 
+            label={{ value: 'Go-Go', position: 'insideTop', fill: '#22c55e', fontSize: 11 }} 
+          />
+          <ReferenceArea 
+            x1={inputs.retirementAge + inputs.goGoYears} 
+            x2={inputs.retirementAge + inputs.goGoYears + inputs.slowGoYears} 
+            fill="#f59e0b" fillOpacity={0.06}
+            label={{ value: 'Slow-Go', position: 'insideTop', fill: '#f59e0b', fontSize: 11 }} 
+          />
+          <ReferenceArea 
+            x1={inputs.retirementAge + inputs.goGoYears + inputs.slowGoYears} 
+            x2={inputs.planningAge} 
+            fill="#ef4444" fillOpacity={0.06}
+            label={{ value: 'No-Go', position: 'insideTop', fill: '#ef4444', fontSize: 11 }} 
+          />
+          <ReferenceLine 
+            x={inputs.retirementAge} 
+            stroke="#f59e0b" 
+            strokeDasharray="4 4" 
+            label={{ value: 'Retire', fill: '#f59e0b', fontSize: 10, position: 'insideTopLeft' }} 
+          />
+          <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
+          <YAxis tickFormatter={formatCompactCurrency} tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} width={80} />
+          <Tooltip
+            contentStyle={{ background: "#111827", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
+            formatter={(value) => [formatCompactCurrency(Number(value)), "Median spend"]}
+            labelFormatter={(age) => `Age ${age}`}
+          />
+          <Area type="monotone" dataKey="spending" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.22} strokeWidth={2} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\StressTestChart.tsx
+import { useState, useEffect } from "react";
+import { STRESS_SCENARIOS } from "../../lib/constants";
+import { runSimulation } from "../../engine/monteCarlo";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+import type { SimResults } from "../../types";
+
+interface ResultRow {
+  scenario: typeof STRESS_SCENARIOS[number];
+  result: SimResults;
+  p10: number;
+}
+
+export function StressTestChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const [rows, setRows] = useState<ResultRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    setRows([]);
+    
+    // Run each scenario in a separate setTimeout to avoid blocking
+    const reducedInputs = { 
+      ...inputs, 
+      numSimulations: Math.min(inputs.numSimulations, 500) 
+    };
+    
+    let index = 0;
+    const results: ResultRow[] = [];
+    
+    function runNext() {
+      if (index >= STRESS_SCENARIOS.length) {
+        setRows(results);
+        setLoading(false);
+        return;
+      }
+      const scenario = STRESS_SCENARIOS[index];
+      const result = runSimulation(reducedInputs, scenario);
+      const last = result.percentilePaths[result.percentilePaths.length - 1];
+      results.push({ scenario, result, p10: last?.p10 ?? 0 });
+      index++;
+      setTimeout(runNext, 0); // yield to browser between each
+    }
+    
+    setTimeout(runNext, 0);
+  }, [inputs]);
+
+  if (loading) {
+    return (
+      <div className="grid gap-3">
+        {[1,2,3,4,5].map(i => (
+          <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-700/30" />
+        ))}
+        <p className="text-center text-sm text-[var(--text-muted)]">Running stress tests...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border">
+      <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr] bg-[#111827] p-3 text-xs font-bold uppercase tracking-[0.16em] text-mutedText">
+        <span>Scenario</span><span>Success</span><span>Median</span><span>10th pct.</span>
+      </div>
+      {rows.map((row) => (
+        <div key={row.scenario.key} className="grid grid-cols-[1.4fr_1fr_1fr_1fr] border-t border-border p-3 text-sm">
+          <span className="font-semibold text-primaryText">{row.scenario.label}</span>
+          <span className={row.result.successRate >= 0.85 ? "text-success" : row.result.successRate >= 0.7 ? "text-warning" : "text-danger"}>{formatPercentage(row.result.successRate, 0)}</span>
+          <span className="text-mutedText">{formatCompactCurrency(row.result.medianTerminalWealth)}</span>
+          <span className={row.p10 <= 0 ? "text-danger" : "text-mutedText"}>{formatCompactCurrency(row.p10)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\WealthFanChart.tsx
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ReferenceLine,
+  ReferenceArea,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Slider } from "../../components/ui/slider";
+import { formatCompactCurrency, formatMillions } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+import type { PercentilesAtAge } from "../../types";
+
+interface ChartDatum extends PercentilesAtAge {
+  p10p90: [number, number];
+  p25p75: [number, number];
+}
+
+function chartData(data: PercentilesAtAge[]): ChartDatum[] {
+  return data.map((point) => ({
+    ...point,
+    p10p90: [point.p10, point.p90],
+    p25p75: [point.p25, point.p75],
+  }));
+}
+
+export function WealthFanChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const results = useSimStore((state) => state.results);
+  const setInput = useSimStore((state) => state.setInput);
+  const isRunning = useSimStore((state) => state.isRunning);
+
+  const retirementIndex = results?.percentilePaths
+    .findIndex(p => p.age === inputs.retirementAge) ?? -1;
+  const retirePlusFive = results?.percentilePaths
+    .find(p => p.age === inputs.retirementAge + 5);
+  const retirePoint = results?.percentilePaths
+    .find(p => p.age === inputs.retirementAge);
+  
+  const sequenceRisk = retirePoint && retirePlusFive && retirePoint.p10 > 0
+    ? (retirePlusFive.p10 - retirePoint.p10) / retirePoint.p10
+    : 0;
+
+  const data = chartData(results?.percentilePaths ?? []);
+
+  if (isRunning) {
+    return <div className="h-[520px] animate-pulse rounded-lg border border-border bg-slate-700/30" />;
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="h-[520px] min-h-[360px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 20, right: 28, left: 10, bottom: 12 }}>
+            <CartesianGrid stroke="#2d3748" strokeOpacity={0.55} vertical={false} />
+            <XAxis
+              dataKey="age"
+              type="number"
+              domain={[inputs.currentAge, inputs.planningAge]}
+              tick={{ fill: "#94a3b8", fontSize: 12 }}
+              tickLine={false}
+              axisLine={{ stroke: "#2d3748" }}
+            />
+            <YAxis
+              tick={{ fill: "#94a3b8", fontSize: 12 }}
+              tickFormatter={formatMillions}
+              tickLine={false}
+              axisLine={false}
+              width={82}
+            />
+            <Tooltip
+              cursor={{ stroke: "#14b8a6", strokeOpacity: 0.35 }}
+              contentStyle={{
+                background: "#111827",
+                border: "1px solid #2d3748",
+                borderRadius: 8,
+                color: "#f1f5f9",
+              }}
+              formatter={(value, name) => {
+                if (Array.isArray(value)) {
+                  return [
+                    `${formatCompactCurrency(Number(value[0]))} - ${formatCompactCurrency(Number(value[1]))}`,
+                    name,
+                  ];
+                }
+
+                return [formatCompactCurrency(Number(value)), name];
+              }}
+              labelFormatter={(age) => `Age ${age}`}
+            />
+            <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 12 }} />
+            <ReferenceLine
+              y={0}
+              stroke="#dc2626"
+              strokeDasharray="5 5"
+            />
+            <ReferenceLine
+              x={inputs.retirementAge}
+              stroke="#f59e0b"
+              strokeDasharray="5 5"
+              label={{ value: "Retire", fill: "#f59e0b", position: "insideTopRight" }}
+            />
+            <ReferenceLine
+              x={inputs.socialSecurityAge}
+              stroke="#38bdf8"
+              strokeDasharray="5 5"
+              label={{ value: "SS Starts", fill: "#38bdf8", position: "insideTopRight" }}
+            />
+            <Area
+              type="monotone"
+              dataKey="p10p90"
+              name="10th-90th percentile"
+              stroke="none"
+              fill="#14b8a6"
+              fillOpacity={0.15}
+              activeDot={false}
+            />
+            <Area
+              type="monotone"
+              dataKey="p25p75"
+              name="25th-75th percentile"
+              stroke="none"
+              fill="#14b8a6"
+              fillOpacity={0.25}
+              activeDot={false}
+            />
+            <Line type="monotone" dataKey="p50" name="Median" stroke="#e2fffb" strokeWidth={2} dot={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="rounded-md border border-border bg-[#111827] p-3">
+        <div className="mb-2 flex items-center justify-between text-xs">
+          <span className="font-semibold uppercase tracking-[0.18em] text-mutedText">Drag retirement marker</span>
+          <span className="font-semibold text-warning">Age {inputs.retirementAge}</span>
+        </div>
+        <Slider
+          value={[inputs.retirementAge]}
+          min={inputs.currentAge + 1}
+          max={inputs.planningAge - 1}
+          step={1}
+          onValueChange={([value]) => setInput("retirementAge", value ?? inputs.retirementAge)}
+        />
+      </div>
+      {sequenceRisk < -0.25 && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm">
+          <span className="font-bold text-red-300">
+            âš ï¸ Sequence of Returns Risk Detected
+          </span>
+          <p className="mt-1 text-[var(--text-muted)]">
+            In the worst 10% of scenarios, your portfolio drops 
+            {Math.abs(sequenceRisk * 100).toFixed(0)}% in the 
+            first 5 years of retirement. A market downturn early 
+            in retirement is especially damaging â€” consider 
+            maintaining 2 years of cash reserves as a buffer.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\dashboard\HeroVerdict.tsx
+import { useState, useEffect } from "react";
+import { getInvestableAssets, solveSustainableSpend } from "../../engine/monteCarlo";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { cn } from "../../lib/utils";
+import type { SimInputs, SimResults } from "../../types";
+
+interface HeroVerdictProps {
+  inputs: SimInputs;
+  results: SimResults | null;
+}
+
+function tone(successRate: number) {
+  if (successRate >= 0.85) return { border: "border-l-success", text: "text-success" };
+  if (successRate >= 0.7) return { border: "border-l-warning", text: "text-warning" };
+  return { border: "border-l-danger", text: "text-danger" };
+}
+
+export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
+  const successRate = results?.successRate;
+  const activeTone = tone(successRate ?? 0);
+  
+  const [sustainableSpend, setSustainableSpend] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!results) {
+      setSustainableSpend(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const spend = solveSustainableSpend(inputs);
+      setSustainableSpend(spend);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [results?.successRate, inputs.retirementAge, inputs.planningAge, inputs.taxableAssets, inputs.taxDeferredAssets, inputs.taxFreeAssets]);
+
+  return (
+    <section className={cn("min-h-[120px] rounded-lg border border-border border-l-4 bg-card p-5 shadow-terminal", activeTone.border)}>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)] lg:items-center">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-mutedText">Live verdict</p>
+          <h1 className="mt-2 text-[22px] font-bold leading-tight text-primaryText md:text-3xl">
+            You can sustain {formatCompactCurrency(inputs.spendingGoGo)}/year with{" "}
+            <span className={cn("transition-all duration-300", activeTone.text)}>
+              {successRate === undefined ? "--" : formatPercentage(successRate, 0)}
+            </span>{" "}
+            confidence through age {inputs.planningAge}
+          </h1>
+          <p className="mt-2 text-sm font-semibold" style={{color: 'var(--accent)'}}>
+            Safe sustainable spend at 85% confidence: 
+            {sustainableSpend ? `${formatCompactCurrency(sustainableSpend * 12)}/year Â· ${formatCompactCurrency(sustainableSpend)}/month` : "--"}
+          </p>
+          <p className="mt-3 text-sm text-mutedText">
+            Retiring at {inputs.retirementAge} / {formatCompactCurrency(getInvestableAssets(inputs))} investable /{" "}
+            {inputs.numSimulations.toLocaleString()} simulations / Live model
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Pill label="Success Rate" value={successRate === undefined ? "--" : formatPercentage(successRate, 0)} className={activeTone.text} />
+          <Pill label="Median Terminal" value={results ? formatCompactCurrency(results.medianTerminalWealth) : "--"} />
+          <Pill label="Ruin Prob." value={results ? formatPercentage(results.ruinProbability, 0) : "--"} className={results && results.ruinProbability > 0.2 ? "text-danger" : ""} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Pill({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-[#111827] p-3 text-center">
+      <p className={cn("text-2xl font-bold transition-all duration-300", className)}>{value}</p>
+      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-mutedText">{label}</p>
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\dashboard\NetWorthSnapshot.tsx
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { getInvestableAssets } from "../../engine/monteCarlo";
+import { formatCompactCurrency } from "../../lib/formatters";
+import type { SimInputs } from "../../types";
+
+interface NetWorthSnapshotProps {
+  inputs: SimInputs;
+}
+
+const colors = ["#14b8a6", "#3b82f6", "#22c55e", "#64748b", "#94a3b8"];
+
+export function NetWorthSnapshot({ inputs }: NetWorthSnapshotProps) {
+  const data = [
+    { name: "Taxable", value: inputs.taxableAssets },
+    { name: "Tax-Deferred", value: inputs.taxDeferredAssets },
+    { name: "Tax-Free", value: inputs.taxFreeAssets },
+    { name: "Illiquid", value: inputs.illiquidAssets },
+    { name: "Cash", value: inputs.cashReserves },
+  ];
+  const gross = data.reduce((sum, item) => sum + item.value, 0);
+  const liquid = getInvestableAssets(inputs);
+  const liquidPct = gross > 0 ? (liquid / gross) * 100 : 0;
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-mutedText">Net Worth Snapshot</p>
+        <p className="text-sm font-semibold text-primaryText">Total {formatCompactCurrency(gross)}</p>
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_180px] lg:items-center">
+        <div>
+          <div className="flex h-4 overflow-hidden rounded-full bg-slate-800">
+            {data.map((item, index) => (
+              <div key={item.name} style={{ width: `${gross > 0 ? (item.value / gross) * 100 : 0}%`, backgroundColor: colors[index] }} />
+            ))}
+          </div>
+          <div className="mt-4 grid gap-2 text-sm text-mutedText sm:grid-cols-3">
+            <span>Liquid: <strong className="text-primaryText">{formatCompactCurrency(liquid)} ({liquidPct.toFixed(0)}%)</strong></span>
+            <span>Illiquid: <strong className="text-primaryText">{formatCompactCurrency(inputs.illiquidAssets)}</strong></span>
+            <span>Total: <strong className="text-primaryText">{formatCompactCurrency(gross)}</strong></span>
+          </div>
+        </div>
+        <div className="h-36">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+              <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid #2d3748", color: "#f1f5f9" }} formatter={(value) => formatCompactCurrency(Number(value))} />
+              <Pie data={data} dataKey="value" nameKey="name" innerRadius={42} outerRadius={62} paddingAngle={2}>
+                {data.map((item, index) => <Cell key={item.name} fill={colors[index]} />)}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\dashboard\StatCard.tsx
+import type { LucideIcon } from "lucide-react";
+import { Line, LineChart, ReferenceLine, ResponsiveContainer } from "recharts";
+import { Card, CardContent } from "../../components/ui/card";
+import { cn } from "../../lib/utils";
+
+interface StatCardProps {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  description: string;
+  tone?: "success" | "warning" | "danger" | "neutral";
+  sparklineData?: number[];
+  sparklineColor?: string;
+}
+
+const toneClass = {
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-danger",
+  neutral: "text-primaryText",
+};
+
+export function StatCard({ icon: Icon, label, value, description, tone = "neutral", sparklineData, sparklineColor }: StatCardProps) {
+  return (
+    <Card className="shadow-none">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mutedText">{label}</p>
+            <p className={cn("mt-3 text-3xl font-bold transition-colors duration-300", toneClass[tone])}>{value}</p>
+          </div>
+          <div className="rounded-md border border-border bg-white/[0.04] p-2 text-teal-200">
+            <Icon size={18} />
+          </div>
+        </div>
+        <p className="mt-3 text-sm leading-5 text-mutedText">{description}</p>
+        {sparklineData && sparklineData.length > 0 && (
+          <div className="mt-3 h-10 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={sparklineData.map((v, i) => ({ i, v }))}>
+                <Line 
+                  type="monotone" 
+                  dataKey="v" 
+                  stroke={sparklineColor ?? 'var(--accent)'} 
+                  strokeWidth={1.5} 
+                  dot={false} 
+                  isAnimationActive={false}
+                />
+                <ReferenceLine y={0} stroke="#ef4444" strokeOpacity={0.4} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\inputs\AgeInput.tsx
+import { SliderInput } from "./SliderInput";
+
+interface AgeInputProps {
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  onChange: (value: number) => void;
+  error?: string;
+}
+
+export function AgeInput({ label, value, min = 18, max = 105, onChange, error }: AgeInputProps) {
+  return <SliderInput label={label} value={value} min={min} max={max} step={1} onChange={onChange} suffix="yrs" error={error} />;
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\inputs\CurrencyInput.tsx
+import { SliderInput } from "./SliderInput";
+
+interface CurrencyInputProps {
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (value: number) => void;
+  error?: string;
+}
+
+export function CurrencyInput({
+  label,
+  value,
+  min = 0,
+  max = 10_000_000,
+  step = 25_000,
+  onChange,
+  error,
+}: CurrencyInputProps) {
+  return <SliderInput label={label} value={value} min={min} max={max} step={step} onChange={onChange} format="currency" error={error} />;
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\inputs\presets.ts
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\inputs\SliderInput.tsx
+import React, { useState, useRef, useEffect } from "react";
+import { Slider } from "../../components/ui/slider"; 
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+import { cn } from "../../lib/utils";
+
+interface SliderInputProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  format?: "currency" | "percent" | "number";
+  suffix?: string;
+  error?: string;
+}
+
+export function SliderInput({ label, value, min, max, step, onChange, format = "number", error }: SliderInputProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [impact, setImpact] = useState<{ delta: number; visible: boolean }>({ delta: 0, visible: false });
+  const results = useSimStore(state => state.results);
+  const prevSuccessRef = useRef(results?.successRate ?? 0);
+  
+  const percentage = ((value - min) / (max - min)) * 100;
+
+  useEffect(() => {
+    const currentSuccess = results?.successRate ?? 0;
+    if (Math.abs(currentSuccess - prevSuccessRef.current) > 0.001) {
+      setImpact({ delta: currentSuccess - prevSuccessRef.current, visible: true });
+      prevSuccessRef.current = currentSuccess;
+      const timer = setTimeout(() => setImpact(prev => ({ ...prev, visible: false })), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [results?.successRate]);
+
+  const formattedValue = (val: number) => {
+    if (format === "currency") return formatCompactCurrency(val);
+    if (format === "percent") return formatPercentage(val, 1);
+    return val.toLocaleString();
+  };
+
+  return (
+    <div className="grid gap-4 py-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</span>
+          {impact.visible && (
+            <span className={cn(
+              "text-[10px] font-bold transition-opacity duration-500",
+              impact.delta > 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
+            )}>
+              {impact.delta > 0 ? "â†‘" : "â†“"} {Math.abs(impact.delta * 100).toFixed(1)}%
+            </span>
+          )}
+        </div>
+        <input 
+          type="text"
+          value={format === "currency" ? `$${value.toLocaleString()}` : value}
+          onChange={(e) => onChange(Number(e.target.value.replace(/[^0-9.-]+/g, "")))}
+          onFocus={(e) => e.target.select()}
+          className="w-24 bg-transparent text-right font-mono text-[15px] font-medium text-[var(--accent)] outline-none focus:shadow-[0_0_0_2px_var(--accent-glow)] rounded px-1"
+        />
+      </div>
+
+      <div 
+        className="relative pt-6 pb-2"
+        onMouseDown={() => setIsDragging(true)}
+        onMouseUp={() => setIsDragging(false)}
+        onTouchStart={() => setIsDragging(true)}
+        onTouchEnd={() => setIsDragging(false)}
+      >
+        {isDragging && (
+          <div 
+            className="absolute -top-2 z-20 -translate-x-1/2 rounded bg-[var(--accent)] px-2 py-1 text-[11px] font-bold text-white shadow-lg transition-opacity duration-150"
+            style={{ left: `${percentage}%` }}
+          >
+            {formattedValue(value)}
+            <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-[var(--accent)]" />
+          </div>
+        )}
+        
+        <Slider 
+          value={[value]} 
+          min={min} 
+          max={max} 
+          step={step} 
+          onValueChange={([next]) => onChange(next ?? value)}
+          className="relative flex items-center select-none touch-none w-full h-5"
+          style={{
+            background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${percentage}%, var(--border) ${percentage}%, var(--border) 100%)`,
+            borderRadius: '999px',
+            height: '4px'
+          }}
+        />
+
+        <div className="mt-4 flex justify-between px-1 text-[10px] font-medium text-[var(--text-muted)]">
+          <span>{formattedValue(min)}</span>
+          <span>{formattedValue((min + max) / 2)}</span>
+          <span>{formattedValue(max)}</span>
+        </div>
+      </div>
+
+      {error && <p className="text-xs font-medium text-[var(--danger)]">{error}</p>}
+      <style>{`
+        .SliderThumb {
+          width: 18px; height: 18px;
+          background: var(--accent);
+          border: 2px solid white;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\AppShell.tsx
+import { HelpCircle, Menu, Share2, X } from "lucide-react";
+import { useState } from "react";
+import { useTheme } from "../../lib/useTheme";
+import { Button } from "../../components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
+import { formatCompactCurrency } from "../../lib/formatters";
+import { cn } from "../../lib/utils";
+import { useSimStore } from "../../store/useSimStore";
+import { MainPanel } from "./MainPanel";
+import { Sidebar } from "./Sidebar";
+
+export function AppShell() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [toast, setToast] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const isRunning = useSimStore((state) => state.isRunning);
+  const numSimulations = useSimStore((state) => state.inputs.numSimulations);
+  const resetInputs = useSimStore(state => state.resetInputs);
+
+  return (
+    <div className="min-h-screen bg-background text-primaryText">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-xl">
+        <div className="flex h-[56px] items-center justify-between px-4 lg:px-6">
+          <div>
+            <p className="bg-gradient-to-r from-teal-400 to-blue-400 bg-clip-text text-lg font-extrabold uppercase tracking-widest text-transparent">Terminus</p>
+          </div>
+
+          <div className="hidden items-center gap-1 md:flex">
+            {(['dark', 'light', 'sepia'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                  theme === t 
+                    ? 'bg-[var(--accent)] text-white' 
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {t === 'dark' ? 'ðŸŒ™ Dark' : t === 'light' ? 'â˜€ï¸ Light' : 'ðŸ“œ Sepia'}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              className="text-xs px-2 h-7"
+              onClick={resetInputs}>
+              Reset
+            </Button>
+
+            <div className="hidden items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 sm:flex">
+              <span className={cn("size-2 rounded-full bg-emerald-400", isRunning && "animate-pulse")} />
+              Live Model
+            </div>
+            <span className="rounded-full border border-border bg-white/[0.04] px-3 py-2 text-xs font-semibold text-mutedText">{formatCompactCurrency(numSimulations).replace("$", "")} runs</span>
+            <Button variant="ghost" className="size-9 px-0" aria-label="Share" onClick={() => { setToast(true); window.setTimeout(() => setToast(false), 1800); }}><Share2 size={17} /></Button>
+            <Tooltip>
+              <TooltipTrigger asChild><Button variant="ghost" className="size-9 px-0" aria-label="Help"><HelpCircle size={17} /></Button></TooltipTrigger>
+              <TooltipContent className="max-w-xs rounded-md border border-border bg-[#1e293b] p-3 text-sm text-primaryText">Terminus models your complete financial picture using Monte Carlo simulation across thousands of possible futures.</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </header>
+      {toast ? <div className="fixed right-4 top-24 z-50 rounded-lg border border-border bg-[#1e293b] px-4 py-3 text-sm shadow-terminal">Share links coming soon.</div> : null}
+      <div className="grid lg:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="hidden lg:block"><Sidebar /></div>
+        <MainPanel />
+      </div>
+      <Button className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 gap-2 md:hidden" onClick={() => setMobileOpen(true)}><Menu size={16} /> Edit Inputs</Button>
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 bg-black/50 md:hidden">
+          <div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-hidden rounded-t-2xl border border-border bg-sidebar">
+            <div className="flex items-center justify-between border-b border-border p-4">
+              <p className="font-bold text-primaryText">Edit Inputs</p>
+              <Button variant="ghost" className="size-9 px-0" onClick={() => setMobileOpen(false)}><X size={18} /></Button>
+            </div>
+            <Sidebar mobile />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\MainPanel.tsx
+import { PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
+import { RichBrokeDeadChart } from "../../components/charts/RichBrokeDeadChart";
+import { ScenarioCompareChart } from "../../components/charts/ScenarioCompareChart";
+import { SpendingSmileChart } from "../../components/charts/SpendingSmileChart";
+import { StressTestChart } from "../../components/charts/StressTestChart";
+import { WealthFanChart } from "../../components/charts/WealthFanChart";
+import { HeroVerdict } from "../../components/dashboard/HeroVerdict";
+import { StatCard } from "../../components/dashboard/StatCard";
+import { Card, CardContent, CardHeader } from "../../components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+
+function ruinTone(ruinProbability: number) {
+  if (ruinProbability > 0.2) return "danger";
+  if (ruinProbability >= 0.1) return "warning";
+  return "success";
+}
+
+export function MainPanel() {
+  const inputs = useSimStore((state) => state.inputs);
+  const results = useSimStore((state) => state.results);
+  const errors = useSimStore((state) => state.errors);
+  const hasErrors = Object.keys(errors).length > 0;
+  const isRunning = useSimStore((state) => state.isRunning);
+
+  return (
+    <section className="grid gap-4 p-4 pb-28 md:pb-4 lg:p-6">
+      {hasErrors ? <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-red-200">Fix inputs above to update simulation</div> : null}
+      
+      <div className={`overflow-hidden transition-all duration-300 ${
+        isRunning ? 'max-h-10 opacity-100' : 'max-h-0 opacity-0'
+      }`}>
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-2 text-sm font-semibold text-[var(--accent)]">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
+          Recalculating simulation...
+        </div>
+      </div>
+
+      <HeroVerdict inputs={inputs} results={results} />
+      {/* <NetWorthSnapshot inputs={inputs} /> */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard 
+          icon={ShieldAlert} 
+          label="Ruin Probability" 
+          value={results ? formatPercentage(results.ruinProbability, 1) : "--"} 
+          description="Paths that ever depleted during retirement." 
+          tone={results ? ruinTone(results.ruinProbability) : "neutral"} 
+          sparklineData={results?.percentilePaths.map(p => p.p10) ?? []}
+          sparklineColor="#ef4444"
+        />
+        <StatCard 
+          icon={PiggyBank} 
+          label="Median Terminal Wealth" 
+          value={results ? formatCompactCurrency(results.medianTerminalWealth) : "--"} 
+          description={`Median portfolio value at age ${inputs.planningAge}.`} 
+          tone="neutral" 
+          sparklineData={results?.percentilePaths.map(p => p.p50) ?? []}
+          sparklineColor="var(--accent)"
+        />
+        <StatCard 
+          icon={TrendingUp} 
+          label="Success Rate" 
+          value={results ? formatPercentage(results.successRate, 1) : "--"} 
+          description="Inverse of probability of ruin." 
+          tone={results && results.successRate >= 0.85 ? "success" : results && results.successRate >= 0.7 ? "warning" : "danger"} 
+          sparklineData={results?.stackedBands.map(b => b.flourishing + b.thriving + b.surviving) ?? []}
+          sparklineColor="#22c55e"
+        />
+      </div>
+      <Tabs defaultValue="rich">
+        <Card className="shadow-none">
+          <CardHeader className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-200">Probability Analytics</p>
+              <h2 className="mt-2 text-xl font-bold text-primaryText">Rich, Broke or Dead</h2>
+            </div>
+            <TabsList className="w-full overflow-x-auto lg:w-auto">
+              <TabsTrigger value="rich">Rich/Broke/Dead</TabsTrigger>
+              <TabsTrigger value="wealth">Wealth Trajectories</TabsTrigger>
+              <TabsTrigger value="spending">Spending Plan</TabsTrigger>
+              <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
+              <TabsTrigger value="stress">Stress Tests</TabsTrigger>
+            </TabsList>
+          </CardHeader>
+          <CardContent className="p-4">
+            <TabsContent value="rich"><RichBrokeDeadChart /></TabsContent>
+            <TabsContent value="wealth"><WealthFanChart /></TabsContent>
+            <TabsContent value="spending"><SpendingSmileChart /></TabsContent>
+            <TabsContent value="scenarios"><ScenarioCompareChart /></TabsContent>
+            <TabsContent value="stress"><StressTestChart /></TabsContent>
+          </CardContent>
+        </Card>
+      </Tabs>
+    </section>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\presets.ts
+import type { SimInputs } from "../../types";
+
+export interface Preset {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  inputs: Partial<SimInputs>;
+}
+
+export const PRESETS: Preset[] = [
+  {
+    id: 'pe-partner',
+    name: 'PE Partner',
+    emoji: 'ðŸ’¼',
+    description: 'Age 47, retiring at 55, complex asset mix',
+    inputs: {
+      currentAge: 47,
+      retirementAge: 55,
+      planningAge: 92,
+      taxableAssets: 2500000,
+      taxDeferredAssets: 800000,
+      taxFreeAssets: 200000,
+      illiquidAssets: 1500000,
+      cashReserves: 150000,
+      spendingGoGo: 280000,
+      spendingSlowGo: 210000,
+      spendingNoGo: 160000,
+      expectedReturn: 0.07,
+      volatility: 0.15,
+      inflationRate: 0.028
+    }
+  },
+  {
+    id: 'early-retiree',
+    name: 'Early Retiree',
+    emoji: 'ðŸ–ï¸',
+    description: 'Age 38, FIRE at 45, lean spending',
+    inputs: {
+      currentAge: 38,
+      retirementAge: 45,
+      planningAge: 95,
+      taxableAssets: 800000,
+      taxDeferredAssets: 400000,
+      taxFreeAssets: 300000,
+      illiquidAssets: 0,
+      spendingGoGo: 80000,
+      spendingSlowGo: 65000,
+      spendingNoGo: 50000,
+      expectedReturn: 0.07,
+      volatility: 0.15,
+      inflationRate: 0.028
+    }
+  },
+  {
+    id: 'dual-income',
+    name: 'Dual Income',
+    emoji: 'ðŸ‘«',
+    description: 'Two earners, retiring together at 60',
+    inputs: {
+      currentAge: 52, retirementAge: 60, planningAge: 92,
+      hasSpouse: true, spouseCurrentAge: 49, spouseRetirementAge: 60,
+      taxableAssets: 1800000, taxDeferredAssets: 1200000,
+      taxFreeAssets: 400000, illiquidAssets: 300000,
+      spendingGoGo: 200000, spendingSlowGo: 155000, spendingNoGo: 120000,
+      expectedReturn: 0.07, volatility: 0.15, inflationRate: 0.028
+    }
+  },
+  {
+    id: 'conservative',
+    name: 'Conservative',
+    emoji: 'ðŸ›¡ï¸',
+    description: 'Age 58, retiring at 65, low risk tolerance',
+    inputs: {
+      currentAge: 58, retirementAge: 65, planningAge: 90,
+      taxableAssets: 1200000, taxDeferredAssets: 900000,
+      taxFreeAssets: 150000, illiquidAssets: 0,
+      spendingGoGo: 120000, spendingSlowGo: 95000, spendingNoGo: 80000,
+      expectedReturn: 0.055, volatility: 0.10, inflationRate: 0.028
+    }
+  }
+];
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\Sidebar.tsx
+import { Trash2 } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../../components/ui/accordion";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Switch } from "../../components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
+import { AgeInput } from "../../components/inputs/AgeInput";
+import { CurrencyInput } from "../../components/inputs/CurrencyInput";
+import { SliderInput } from "../../components/inputs/SliderInput";
+import { getInvestableAssets, getTotalNetWorth } from "../../engine/monteCarlo";
+import { formatCompactCurrency } from "../../lib/formatters";
+import { cn } from "../../lib/utils";
+import { useSimStore } from "../../store/useSimStore";
+import type { LumpyEvent } from "../../types";
+import { PRESETS, type Preset } from "./presets";
+import { AnimatedNumber } from "../../components/ui/AnimatedNumber";
+
+function Chip({ children }: { children: React.ReactNode }) {
+  return <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-muted)]">{children}</span>;
+}
+
+function confidenceToProbability(confidence: LumpyEvent["confidence"]) {
+  if (confidence === "low") return 0.4;
+  if (confidence === "high") return 0.9;
+  return 0.7;
+}
+
+export function Sidebar({ mobile = false }: { mobile?: boolean }) {
+  const inputs = useSimStore((state) => state.inputs);
+  const errors = useSimStore((state) => state.errors);
+  const setInput = useSimStore((state) => state.setInput);
+  const setInputs = useSimStore((state) => state.setInputs);
+  const addLumpyEvent = useSimStore((state) => state.addLumpyEvent);
+  const updateLumpyEvent = useSimStore((state) => state.updateLumpyEvent);
+  const removeLumpyEvent = useSimStore((state) => state.removeLumpyEvent);
+  
+  const investable = getInvestableAssets(inputs);
+  const totalNW = getTotalNetWorth(inputs);
+  const gross = investable + inputs.illiquidAssets;
+  const liquidPct = gross > 0 ? (investable / gross) * 100 : 0;
+
+  return (
+    <aside className={`${mobile ? "max-h-[85vh]" : "h-[calc(100vh-56px)] lg:sticky lg:top-[56px]"} sidebar-scroll flex flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)]`}>
+      <div className="flex-1 overflow-y-auto p-5 pb-32">
+        <div className="mb-8">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-muted)] mb-4">Quick Start</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {PRESETS.map((p: Preset) => (
+              <button
+                key={p.id}
+                onClick={() => setInputs(p.inputs)}
+                className={cn(
+                  "flex flex-col items-start rounded-xl border p-3 text-left transition-all hover:bg-[var(--bg-card-hover)]",
+                  JSON.stringify(inputs).slice(0, 100) === JSON.stringify(p.inputs).slice(0, 100) 
+                    ? "border-[var(--accent)] bg-[var(--accent-glow)] shadow-[0_0_0_1px_var(--accent)]" 
+                    : "border-[var(--border)] bg-[var(--bg-card)]"
+                )}
+              >
+                <span className="text-xl mb-1">{p.emoji}</span>
+                <span className="text-[13px] font-bold text-[var(--text-primary)]">{p.name}</span>
+                <span className="text-[10px] text-[var(--text-muted)] line-clamp-1">{p.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <Accordion type="multiple" defaultValue={["you", "assets"]} className="grid gap-3">
+          <AccordionItem value="you" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+            <AccordionTrigger>You & Your Spouse <Chip>Retire {inputs.retirementAge}</Chip></AccordionTrigger>
+            <AccordionContent className="grid gap-4">
+              <AgeInput label="Your current age" value={inputs.currentAge} min={30} max={70} error={errors.currentAge} onChange={(value) => setInput("currentAge", value)} />
+              <AgeInput label="Your retirement age" value={inputs.retirementAge} min={40} max={75} error={errors.retirementAge} onChange={(value) => setInput("retirementAge", value)} />
+              <AgeInput label="Live to age" value={inputs.planningAge} min={75} max={100} error={errors.planningAge} onChange={(value) => setInput("planningAge", value)} />
+              <div className="flex items-center justify-between rounded-md border border-[var(--border)] bg-white/[0.03] p-3">
+                <span className="text-sm font-medium">Include spouse?</span>
+                <Switch checked={inputs.hasSpouse} onCheckedChange={(checked) => setInput("hasSpouse", checked)} />
+              </div>
+              {inputs.hasSpouse && (
+                <>
+                  <AgeInput label="Spouse current age" value={inputs.spouseCurrentAge} min={30} max={70} onChange={(value) => setInput("spouseCurrentAge", value)} />
+                  <AgeInput label="Spouse retirement age" value={inputs.spouseRetirementAge} min={40} max={75} onChange={(value) => setInput("spouseRetirementAge", value)} />
+                </>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="assets" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+            <AccordionTrigger>Your Assets <Chip>{formatCompactCurrency(investable)} liquid</Chip></AccordionTrigger>
+            <AccordionContent className="grid gap-4">
+              <CurrencyInput label="Taxable Brokerage" value={inputs.taxableAssets} onChange={(v) => setInput("taxableAssets", v)} />
+              <CurrencyInput label="401k / IRA" value={inputs.taxDeferredAssets} onChange={(v) => setInput("taxDeferredAssets", v)} />
+              <CurrencyInput label="Roth IRA" value={inputs.taxFreeAssets} onChange={(v) => setInput("taxFreeAssets", v)} />
+              <CurrencyInput label="Illiquid Assets" value={inputs.illiquidAssets} onChange={(v) => setInput("illiquidAssets", v)} />
+              <CurrencyInput label="Cash Reserves" value={inputs.cashReserves} onChange={(v) => setInput("cashReserves", v)} />
+            </AccordionContent>
+          </AccordionItem>
+
+        <AccordionItem value="spending" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionTrigger>
+            Spending Plan
+            <Chip>{formatCompactCurrency(inputs.spendingGoGo)}/yr</Chip>
+          </AccordionTrigger>
+          <AccordionContent className="grid gap-4">
+            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+              The spending smile: high spending in active retirement,
+              less in mid-retirement, then healthcare costs rise late.
+            </p>
+            <SliderInput 
+              label="Go-Go spending (active early retirement)" 
+              value={inputs.spendingGoGo} 
+              min={50000} max={500000} step={5000} 
+              format="currency"
+              onChange={(v) => setInput('spendingGoGo', v)} 
+            />
+            <SliderInput 
+              label="Slow-Go spending (mid retirement)" 
+              value={inputs.spendingSlowGo} 
+              min={30000} max={400000} step={5000} 
+              format="currency"
+              onChange={(v) => setInput('spendingSlowGo', v)} 
+            />
+            <SliderInput 
+              label="No-Go spending (late retirement)" 
+              value={inputs.spendingNoGo} 
+              min={20000} max={300000} step={5000} 
+              format="currency"
+              onChange={(v) => setInput('spendingNoGo', v)} 
+            />
+            <SliderInput 
+              label="Healthcare surge (no-go phase add-on)" 
+              value={inputs.healthcareSurgeAmount} 
+              min={0} max={60000} step={2500} 
+              format="currency"
+              onChange={(v) => setInput('healthcareSurgeAmount', v)} 
+            />
+            <SliderInput 
+              label="Go-Go phase length (years)" 
+              value={inputs.goGoYears} 
+              min={5} max={15} step={1}
+              onChange={(v) => setInput('goGoYears', v)} 
+            />
+            <SliderInput 
+              label="Slow-Go phase length (years)" 
+              value={inputs.slowGoYears} 
+              min={5} max={15} step={1}
+              onChange={(v) => setInput('slowGoYears', v)} 
+            />
+            <SliderInput 
+              label="Inflation rate" 
+              value={inputs.inflationRate} 
+              min={0} max={0.1} step={0.001} 
+              format="percent"
+              onChange={(v) => setInput('inflationRate', v)} 
+            />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="market" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionTrigger>Market <Chip>{(inputs.expectedReturn * 100).toFixed(1)}% Return</Chip></AccordionTrigger>
+          <AccordionContent className="grid gap-4">
+            <SliderInput label="Expected Return" value={inputs.expectedReturn} min={0.01} max={0.15} step={0.005} format="percent" onChange={(v) => setInput("expectedReturn", v)} />
+            <SliderInput label="Volatility" value={inputs.volatility} min={0.01} max={0.3} step={0.01} format="percent" onChange={(v) => setInput("volatility", v)} />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="income" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionTrigger>
+            Income & Social Security
+            <Chip>SS {inputs.socialSecurityAge}</Chip>
+          </AccordionTrigger>
+          <AccordionContent className="grid gap-4">
+            <CurrencyInput label="Your annual salary (pre-retirement)" value={inputs.annualSalary} max={2000000} step={25000} onChange={(v) => setInput('annualSalary', v)} />
+            {inputs.hasSpouse && (
+              <CurrencyInput label="Spouse annual salary" value={inputs.spouseAnnualSalary} max={2000000} step={25000} onChange={(v) => setInput('spouseAnnualSalary', v)} />
+            )}
+            <SliderInput label="Your Social Security claiming age" value={inputs.socialSecurityAge} min={62} max={70} step={1} onChange={(v) => setInput('socialSecurityAge', v)} />
+            <CurrencyInput label="Your SS annual benefit" value={inputs.socialSecurityAmount} max={60000} step={1000} onChange={(v) => setInput('socialSecurityAmount', v)} />
+            {inputs.hasSpouse && (
+              <>
+                <SliderInput label="Spouse SS claiming age" value={inputs.spouseSocialSecurityAge} min={62} max={70} step={1} onChange={(v) => setInput('spouseSocialSecurityAge', v)} />
+                <CurrencyInput label="Spouse SS annual benefit" value={inputs.spouseSocialSecurityAmount} max={60000} step={1000} onChange={(v) => setInput('spouseSocialSecurityAmount', v)} />
+              </>
+            )}
+            <CurrencyInput label="Other annual retirement income" value={inputs.otherRetirementIncome} max={500000} step={5000} onChange={(v) => setInput('otherRetirementIncome', v)} />
+          </AccordionContent>
+        </AccordionItem>
+
+          <AccordionItem value="events" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+            <AccordionTrigger>Lumpy Events <Chip>{inputs.lumpyEvents.length}</Chip></AccordionTrigger>
+            <AccordionContent className="grid gap-3">
+              <div className="mb-2">
+                <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest block mb-2">Quick Fill New Event</span>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { label: 'ðŸ’° Carry', type: 'carry' },
+                    { label: 'ðŸ  RE Sale', type: 're' },
+                    { label: 'ðŸ“ˆ Bonus', type: 'bonus' },
+                    { label: 'ðŸ’¸ Cap Call', type: 'call' },
+                  ].map(btn => (
+                    <button 
+                      key={btn.type}
+                      onClick={() => {
+                        let defaults: any = {};
+                        if (btn.type === 'carry') defaults = { label: "Carry Distribution", taxType: "ltcg", amount: 1500000, confidence: "medium", probability: 0.7 };
+                        if (btn.type === 're') defaults = { label: "Real Estate Sale", taxType: "ltcg", amount: 500000, confidence: "medium", probability: 0.7 };
+                        if (btn.type === 'bonus') defaults = { label: "Annual Bonus", taxType: "ordinary", amount: 200000, confidence: "high", probability: 0.9 };
+                        if (btn.type === 'call') defaults = { label: "Capital Call", taxType: "none", amount: -250000, confidence: "high", probability: 1 };
+                        
+                        addLumpyEvent({
+                          id: Math.random().toString(36).substr(2, 9),
+                          year: inputs.currentAge + 5,
+                          ...defaults
+                        });
+                      }}
+                      className="px-2 py-1 rounded border border-[var(--border)] bg-white/[0.02] text-[10px] hover:bg-[var(--accent)] hover:text-white transition-all"
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {inputs.lumpyEvents.map((event) => (
+                <div key={event.id} className="grid gap-2.5 rounded-lg border border-[var(--border)] bg-white/[0.03] p-3">
+                  {/* Row 1: Label */}
+                  <Input 
+                    value={event.label} 
+                    onChange={(e) => updateLumpyEvent({ ...event, label: e.target.value })} 
+                    placeholder="Event label"
+                    className="h-8 text-xs w-full" 
+                  />
+                  
+                  {/* Row 2: Age, Amount, Confidence */}
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      type="number" 
+                      value={event.year} 
+                      onChange={(e) => updateLumpyEvent({ ...event, year: Number(e.target.value) })} 
+                      className="h-8 text-xs" 
+                      style={{ width: '60px' }}
+                    />
+                    <div className="relative flex-1">
+                      <span className={cn(
+                        "absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold",
+                        event.amount >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
+                      )}>
+                        {event.amount >= 0 ? "+" : "-"}$
+                      </span>
+                      <Input 
+                        type="number" 
+                        value={Math.abs(event.amount)} 
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const sign = event.amount >= 0 ? 1 : -1;
+                          updateLumpyEvent({ ...event, amount: val * sign });
+                        }} 
+                        className={cn(
+                          "h-8 pl-6 text-xs font-medium",
+                          event.amount >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
+                        )}
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      {(['low', 'medium', 'high'] as const).map((conf) => (
+                        <button
+                          key={conf}
+                          onClick={() => updateLumpyEvent({ ...event, confidence: conf, probability: confidenceToProbability(conf) })}
+                          className={cn(
+                            "rounded px-2 py-1 text-[9px] font-bold uppercase transition-colors",
+                            event.confidence === conf ? "bg-[var(--accent)] text-white" : "bg-white/10 text-[var(--text-muted)]"
+                          )}
+                        >
+                          {conf.slice(0, 3)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Row 3: Tax selector, Badge, Delete */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <select 
+                        className="h-8 flex-1 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] px-2 text-[10px] text-[var(--text-primary)]"
+                        value={event.taxType}
+                        onChange={(e) => updateLumpyEvent({ ...event, taxType: e.target.value as any })}
+                      >
+                        <option value="none">No Tax</option>
+                        <option value="ordinary">Ordinary</option>
+                        <option value="ltcg">LTCG</option>
+                      </select>
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-bold border",
+                        event.taxType === 'ltcg' ? "bg-teal-400/10 text-teal-400 border-teal-400/20" :
+                        event.taxType === 'ordinary' ? "bg-amber-400/10 text-amber-400 border-amber-400/20" :
+                        "bg-slate-400/10 text-slate-400 border-slate-400/20"
+                      )}>
+                        {event.taxType === 'ltcg' ? 'LTCG' : event.taxType === 'ordinary' ? 'ORD' : 'FREE'}
+                      </span>
+                    </div>
+                    <button className="h-8 w-8 flex items-center justify-center rounded hover:bg-[var(--danger)]/10 text-[var(--danger)] transition-colors" onClick={() => removeLumpyEvent(event.id)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <Button 
+                className="w-full rounded-lg border border-dashed border-[var(--border)] py-2.5 text-xs text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+                onClick={() => addLumpyEvent({ 
+                  id: Math.random().toString(36).substr(2, 9), 
+                  label: "Custom Event", 
+                  year: inputs.currentAge + 5, 
+                  amount: 0, 
+                  probability: 1, 
+                  taxType: "none", 
+                  confidence: "medium" 
+                })}
+              >
+                + Add Custom Event
+              </Button>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="liabilities" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+            <AccordionTrigger>Liabilities & Obligations <Chip>{formatCompactCurrency(inputs.mortgageBalance)}</Chip></AccordionTrigger>
+            <AccordionContent className="grid gap-4">
+              <CurrencyInput label="Mortgage balance" value={inputs.mortgageBalance} max={3000000} onChange={(v) => setInput('mortgageBalance', v)} />
+              <CurrencyInput label="Annual mortgage payment" value={inputs.mortgageAnnualPayment} max={250000} step={5000} onChange={(v) => setInput('mortgageAnnualPayment', v)} />
+              <SliderInput label="Years remaining on mortgage" value={inputs.mortgageYearsRemaining} min={0} max={30} step={1} onChange={(v) => setInput('mortgageYearsRemaining', v)} />
+              <CurrencyInput label="Annual capital call obligations" value={inputs.capitalCallObligations} max={500000} step={10000} onChange={(v) => setInput('capitalCallObligations', v)} />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="college" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+            <AccordionTrigger>
+              College & Kids
+              <Chip>{inputs.collegeEvents.length} kids</Chip>
+            </AccordionTrigger>
+            <AccordionContent className="grid gap-4">
+              <p className="text-[11px] text-[var(--text-muted)]">
+                College costs are modeled as annual withdrawals during the college years, net of 529 savings. Years are your age when college starts.
+              </p>
+              {inputs.collegeEvents.map((event) => (
+                <div key={event.id} className="rounded-lg border border-[var(--border)] bg-white/[0.03] p-3 grid gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[var(--text-primary)]">{event.childName}</span>
+                    <button className="text-[var(--danger)] text-xs" onClick={() => {
+                      const updated = inputs.collegeEvents.filter(e => e.id !== event.id);
+                      setInput('collegeEvents', updated);
+                    }}>Remove</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <label className="grid gap-1">
+                      <span className="text-[var(--text-muted)] uppercase tracking-widest text-[10px]">Your age at start</span>
+                      <input type="number" value={event.startYear} onChange={e => {
+                        const updated = inputs.collegeEvents.map(ev => ev.id === event.id ? {...ev, startYear: Number(e.target.value)} : ev);
+                        setInput('collegeEvents', updated);
+                      }} className="h-8 rounded border border-[var(--border)] bg-transparent px-2 text-[var(--text-primary)]" />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-[var(--text-muted)] uppercase tracking-widest text-[10px]">Annual cost</span>
+                      <input type="number" value={event.annualCost} onChange={e => {
+                        const updated = inputs.collegeEvents.map(ev => ev.id === event.id ? {...ev, annualCost: Number(e.target.value)} : ev);
+                        setInput('collegeEvents', updated);
+                      }} className="h-8 rounded border border-[var(--border)] bg-transparent px-2 text-[var(--text-primary)]" />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-[var(--text-muted)] uppercase tracking-widest text-[10px]">Years (usually 4)</span>
+                      <input type="number" value={event.years} min={1} max={6} onChange={e => {
+                        const updated = inputs.collegeEvents.map(ev => ev.id === event.id ? {...ev, years: Number(e.target.value)} : ev);
+                        setInput('collegeEvents', updated);
+                      }} className="h-8 rounded border border-[var(--border)] bg-transparent px-2 text-[var(--text-primary)]" />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-[var(--text-muted)] uppercase tracking-widest text-[10px]">529 balance</span>
+                      <input type="number" value={event.existingSavings529} onChange={e => {
+                        const updated = inputs.collegeEvents.map(ev => ev.id === event.id ? {...ev, existingSavings529: Number(e.target.value)} : ev);
+                        setInput('collegeEvents', updated);
+                      }} className="h-8 rounded border border-[var(--border)] bg-transparent px-2 text-[var(--text-primary)]" />
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Total cost: {formatCompactCurrency(Math.max(0, event.annualCost * event.years - event.existingSavings529))} net of 529 savings
+                  </p>
+                </div>
+              ))}
+              <button 
+                onClick={() => {
+                  const newEvent = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    childName: `Child ${inputs.collegeEvents.length + 1}`,
+                    startYear: inputs.currentAge + 18,
+                    annualCost: 85000,
+                    years: 4,
+                    existingSavings529: 100000,
+                  };
+                  setInput('collegeEvents', [...inputs.collegeEvents, newEvent]);
+                }}
+                className="w-full rounded-lg border border-dashed border-[var(--border)] py-2 text-xs text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+              >
+                + Add Child
+              </button>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </div>
+
+      <div className="sticky bottom-0 border-t border-[var(--border)] bg-[var(--bg-secondary)] p-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          <div className="border-r border-[var(--border)] pr-4">
+            <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Net Worth</p>
+            <div className="text-sm font-bold"><AnimatedNumber value={totalNW} format="currency" /></div>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Investable</p>
+            <div className="text-sm font-bold"><AnimatedNumber value={investable} format="currency" /></div>
+          </div>
+          <div className="border-t border-r border-[var(--border)] pr-4 pt-2">
+            <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Illiquid</p>
+            <div className="text-sm font-bold">{formatCompactCurrency(inputs.illiquidAssets)}</div>
+          </div>
+          <div className="border-t border-[var(--border)] pt-2">
+            <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Liquidity</p>
+            <div className="text-sm font-bold text-[var(--accent)]">{liquidPct.toFixed(0)}%</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\accordion.tsx
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+import { ChevronDown } from "lucide-react";
+import { cn } from "../../lib/utils";
+
+export const Accordion = AccordionPrimitive.Root;
+export const AccordionItem = AccordionPrimitive.Item;
+
+export function AccordionTrigger({
+  className,
+  children,
+  ...props
+}: AccordionPrimitive.AccordionTriggerProps) {
+  return (
+    <AccordionPrimitive.Header>
+      <AccordionPrimitive.Trigger
+        className={cn(
+          "flex w-full items-center justify-between gap-3 py-3 text-left text-sm font-semibold text-primaryText",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        <ChevronDown className="size-4 shrink-0 text-mutedText transition-transform duration-200 data-[state=open]:rotate-180" />
+      </AccordionPrimitive.Trigger>
+    </AccordionPrimitive.Header>
+  );
+}
+
+export function AccordionContent({ className, ...props }: AccordionPrimitive.AccordionContentProps) {
+  return (
+    <AccordionPrimitive.Content
+      className={cn("overflow-hidden pb-4 text-sm text-mutedText", className)}
+      {...props}
+    />
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\AnimatedNumber.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { formatCompactCurrency, formatPercentage, formatMillions } from '../../lib/formatters';
+
+interface AnimatedNumberProps {
+  value: number;
+  format: 'currency' | 'percent' | 'millions';
+  duration?: number;
+  className?: string;
+}
+
+const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
+
+export const AnimatedNumber = React.memo(({ 
+  value, 
+  format, 
+  duration = 600, 
+  className 
+}: AnimatedNumberProps) => {
+  const [displayValue, setDisplayValue] = useState(value);
+  const prevValueRef = useRef(value);
+  const startTimeRef = useRef<number | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (prevValueRef.current === value) return;
+    
+    const startValue = prevValueRef.current;
+    setIsAnimating(true);
+    startTimeRef.current = null;
+
+    const animate = (currentTime: number) => {
+      if (!startTimeRef.current) startTimeRef.current = currentTime;
+      const progress = Math.min((currentTime - startTimeRef.current) / duration, 1);
+      const easedProgress = easeOutQuart(progress);
+      
+      const currentVal = startValue + (value - startValue) * easedProgress;
+      setDisplayValue(currentVal);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+        prevValueRef.current = value;
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [value, duration]);
+
+  const formatted = () => {
+    if (!Number.isFinite(displayValue)) return 'â€”';
+    switch (format) {
+      case 'currency':
+        return formatCompactCurrency(displayValue);
+      case 'percent':
+        return formatPercentage(displayValue, 1);
+      case 'millions':
+        return formatMillions(displayValue);
+      default:
+        return displayValue.toLocaleString();
+    }
+  };
+
+  return (
+    <span 
+      className={`${className} tabular-nums transition-colors duration-300 ${
+        isAnimating ? 'text-[var(--accent)]' : ''
+      }`}
+      style={{
+        textShadow: isAnimating ? '0 0 8px var(--accent-glow)' : 'none'
+      }}
+    >
+      {formatted()}
+    </span>
+  );
+});
+
+AnimatedNumber.displayName = 'AnimatedNumber';
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\button.tsx
+import * as React from "react";
+import { cn } from "../../lib/utils";
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "primary" | "secondary" | "ghost" | "danger";
+}
+
+const variants = {
+  primary: "bg-accent text-slate-950 hover:bg-teal-300",
+  secondary: "border border-border bg-white/[0.04] text-primaryText hover:bg-white/[0.08]",
+  ghost: "text-mutedText hover:bg-white/[0.06] hover:text-primaryText",
+  danger: "bg-danger/15 text-red-200 hover:bg-danger/25",
+};
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant = "primary", ...props }, ref) => (
+    <button
+      ref={ref}
+      className={cn(
+        "inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-50",
+        variants[variant],
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+
+Button.displayName = "Button";
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\card.tsx
+import * as React from "react";
+import { cn } from "../../lib/utils";
+
+export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("rounded-lg border border-border bg-card shadow-terminal", className)} {...props} />;
+}
+
+export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("border-b border-border p-4", className)} {...props} />;
+}
+
+export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("p-4", className)} {...props} />;
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\input.tsx
+import * as React from "react";
+import { cn } from "../../lib/utils";
+
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, ...props }, ref) => (
+  <input
+    ref={ref}
+    className={cn(
+      "h-10 w-full rounded-md border border-border bg-[#101522] px-3 text-sm text-primaryText outline-none transition placeholder:text-slate-600 focus:border-accent focus:ring-2 focus:ring-accent/15",
+      className,
+    )}
+    {...props}
+  />
+));
+
+Input.displayName = "Input";
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\slider.tsx
+import * as React from "react";
+import * as SliderPrimitive from "@radix-ui/react-slider";
+import { cn } from "../../lib/utils";
+
+interface SliderProps extends React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> {}
+
+export const Slider = React.forwardRef<React.ElementRef<typeof SliderPrimitive.Root>, SliderProps>(
+  ({ className, ...props }, ref) => (
+    <SliderPrimitive.Root
+      ref={ref}
+      className={cn("relative flex h-5 w-full touch-none select-none items-center", className)}
+      {...props}
+    >
+      <SliderPrimitive.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-slate-700">
+        <SliderPrimitive.Range className="absolute h-full bg-accent" />
+      </SliderPrimitive.Track>
+      <SliderPrimitive.Thumb className="block size-4 rounded-full border border-accent bg-primaryText shadow-lg shadow-accent/20 focus:outline-none focus:ring-2 focus:ring-accent" />
+    </SliderPrimitive.Root>
+  ),
+);
+
+Slider.displayName = "Slider";
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\switch.tsx
+import * as React from "react";
+import * as SwitchPrimitive from "@radix-ui/react-switch";
+import { cn } from "../../lib/utils";
+
+export const Switch = React.forwardRef<
+  React.ElementRef<typeof SwitchPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <SwitchPrimitive.Root
+    ref={ref}
+    className={cn(
+      "relative h-6 w-11 rounded-full bg-slate-700 transition data-[state=checked]:bg-accent",
+      className,
+    )}
+    {...props}
+  >
+    <SwitchPrimitive.Thumb className="block size-5 translate-x-0.5 rounded-full bg-white transition data-[state=checked]:translate-x-5" />
+  </SwitchPrimitive.Root>
+));
+
+Switch.displayName = "Switch";
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\tabs.tsx
+import * as TabsPrimitive from "@radix-ui/react-tabs";
+import { cn } from "../../lib/utils";
+
+export const Tabs = TabsPrimitive.Root;
+
+export function TabsList({ className, ...props }: TabsPrimitive.TabsListProps) {
+  return (
+    <TabsPrimitive.List
+      className={cn("inline-flex rounded-md border border-border bg-[#111827] p-1", className)}
+      {...props}
+    />
+  );
+}
+
+export function TabsTrigger({ className, ...props }: TabsPrimitive.TabsTriggerProps) {
+  return (
+    <TabsPrimitive.Trigger
+      className={cn(
+        "rounded px-3 py-2 text-sm font-medium text-mutedText transition data-[state=active]:bg-accent/15 data-[state=active]:text-teal-200",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export const TabsContent = TabsPrimitive.Content;
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\tooltip.tsx
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+
+export const TooltipProvider = TooltipPrimitive.Provider;
+export const Tooltip = TooltipPrimitive.Root;
+export const TooltipTrigger = TooltipPrimitive.Trigger;
+export const TooltipContent = TooltipPrimitive.Content;
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\engine\monteCarlo.ts
+import { SSA_MORTALITY_QX } from "../lib/constants";
+import { formatCompactCurrency, formatPercentage } from "../lib/formatters";
+import type { CollegeEvent, LumpyEvent, PercentilesAtAge, SimInputs, SimResults, StackedBandDataPoint, StressScenario } from "../types";
+import { getSpendingForAge } from "./spendingSmile";
+
+function randomNormal(): number {
+  const u1 = Math.max(Math.random(), Number.EPSILON);
+  const u2 = Math.random();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+function logNormalReturn(mu: number, sigma: number): number {
+  const z = randomNormal();
+  return Math.exp(mu - 0.5 * sigma ** 2 + sigma * z) - 1;
+}
+
+function percentile(values: number[], target: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.round((target / 100) * (sorted.length - 1))));
+  return sorted[index] ?? 0;
+}
+
+// TODO: Move these to a central tax configuration or user inputs
+const ESTIMATED_ORDINARY_TAX_RATE = 0.40;
+const ESTIMATED_LTCG_TAX_RATE = 0.24;
+
+function taxableEventAmount(event: LumpyEvent): number {
+  if (event.taxType === "ordinary") return event.amount * (1 - ESTIMATED_ORDINARY_TAX_RATE);
+  if (event.taxType === "ltcg") return event.amount * (1 - ESTIMATED_LTCG_TAX_RATE);
+  return event.amount;
+}
+
+function lumpyEventCashFlow(age: number, events: LumpyEvent[]): number {
+  return events.reduce((total, event) => {
+    if (event.year !== age || Math.random() > event.probability) return total;
+    return total + taxableEventAmount(event);
+  }, 0);
+}
+
+function collegeCashFlow(age: number, events: CollegeEvent[], inflationRate: number, currentAge: number): number {
+  return events.reduce((total, event) => {
+    const endAge = event.startYear + event.years;
+    if (age < event.startYear || age >= endAge) return total;
+    const yearIndex = age - event.startYear;
+    const inflatedCost = event.annualCost * Math.pow(1 + inflationRate, Math.max(0, age - currentAge));
+    const savingsOffset = yearIndex === 0 ? Math.min(event.existingSavings529, inflatedCost) : 0;
+    return total - Math.max(0, inflatedCost - savingsOffset);
+  }, 0);
+}
+
+function salaryIncome(age: number, currentAge: number, retirementAge: number, salary: number, inflationRate: number): number {
+  if (age >= retirementAge) return 0;
+  return salary * Math.pow(1 + inflationRate, Math.max(0, age - currentAge));
+}
+
+function socialSecurityIncome(age: number, inputs: SimInputs): number {
+  if (age < inputs.retirementAge) return 0;
+  const primary = age >= inputs.socialSecurityAge ? inputs.socialSecurityAmount : 0;
+  const spouse = inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge ? inputs.spouseSocialSecurityAmount : 0;
+  return (primary + spouse) * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.currentAge));
+}
+
+export function getInvestableAssets(inputs: SimInputs): number {
+  return inputs.taxableAssets + inputs.taxDeferredAssets + inputs.taxFreeAssets + inputs.cashReserves;
+}
+
+export function getTotalNetWorth(inputs: SimInputs): number {
+  return getInvestableAssets(inputs) + inputs.illiquidAssets - inputs.mortgageBalance;
+}
+
+export function getCumulativeMortality(fromAge: number, toAge: number): number {
+  let survival = 1;
+  for (let age = fromAge; age <= toAge; age += 1) {
+    survival *= 1 - (SSA_MORTALITY_QX[age] ?? 0.5);
+  }
+  return (1 - survival) * 100;
+}
+
+function stressReturn(baseReturn: number, inputs: SimInputs, yearIndex: number, stressScenario?: StressScenario): { annualReturn: number; inflationRate: number } {
+  if (!stressScenario) return { annualReturn: baseReturn, inflationRate: inputs.inflationRate };
+  if (yearIndex === 0 && stressScenario.yearOneReturn !== undefined) return { annualReturn: stressScenario.yearOneReturn, inflationRate: inputs.inflationRate };
+  if (yearIndex === 1 && stressScenario.yearTwoReturn !== undefined) return { annualReturn: stressScenario.yearTwoReturn, inflationRate: inputs.inflationRate };
+  if (yearIndex === 2 && stressScenario.yearThreeReturn !== undefined) return { annualReturn: stressScenario.yearThreeReturn, inflationRate: inputs.inflationRate };
+  if (stressScenario.years !== undefined && yearIndex < stressScenario.years) {
+    return {
+      annualReturn: stressScenario.overrideReturn ?? baseReturn,
+      inflationRate: stressScenario.overrideInflation ?? inputs.inflationRate,
+    };
+  }
+  return { annualReturn: baseReturn, inflationRate: inputs.inflationRate };
+}
+
+export function computeStackedBands(
+  paths: number[][],
+  startingAssets: number,
+  retirementAge: number,
+  planningAge: number,
+): StackedBandDataPoint[] {
+  const firstPath = paths[0];
+  if (!firstPath) return [];
+  const currentAge = planningAge - firstPath.length + 1;
+
+  return firstPath.map((_, index) => {
+    const age = currentAge + index;
+    const values = paths.map((path) => path[index] ?? 0);
+    
+    const total = paths.length;
+    const brokeCount = values.filter(v => v <= 0).length;
+    const strugglingCount = values.filter(v => v > 0 && v <= startingAssets * 0.5).length;
+    const survivingCount = values.filter(v => v > startingAssets * 0.5 && v <= startingAssets).length;
+    const thrivingCount = values.filter(v => v > startingAssets && v <= startingAssets * 2).length;
+    const flourishingCount = values.filter(v => v > startingAssets * 2).length;
+
+    const dead = age >= retirementAge ? getCumulativeMortality(retirementAge, age) : 0;
+    const livingPct = Math.max(0, 100 - dead);
+
+    const livingTotal = brokeCount + strugglingCount + survivingCount + thrivingCount + flourishingCount;
+    const scale = livingTotal > 0 ? livingPct / 100 : 0;
+
+    return {
+      age,
+      broke: (brokeCount / total) * 100 * scale,
+      struggling: (strugglingCount / total) * 100 * scale,
+      surviving: (survivingCount / total) * 100 * scale,
+      thriving: (thrivingCount / total) * 100 * scale,
+      flourishing: (flourishingCount / total) * 100 * scale,
+      dead,
+      p10: percentile(values, 10),
+      p25: percentile(values, 25),
+      p50: percentile(values, 50),
+      p75: percentile(values, 75),
+      p90: percentile(values, 90),
+    };
+  });
+}
+
+function buildVerdict(inputs: SimInputs, successRate: number): string {
+  return `Based on your inputs, you can sustain ${formatCompactCurrency(inputs.spendingGoGo)}/year with ${formatPercentage(successRate, 0)} confidence through age ${inputs.planningAge}`;
+}
+
+function estimateEffectiveTaxRate(grossIncome: number): number {
+  // 2024 MFJ brackets (simplified)
+  if (grossIncome <= 23200) return 0.10;
+  if (grossIncome <= 94300) return 0.12;
+  if (grossIncome <= 201050) return 0.22;
+  if (grossIncome <= 383900) return 0.24;
+  if (grossIncome <= 487450) return 0.32;
+  if (grossIncome <= 731200) return 0.35;
+  return 0.37;
+}
+
+export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario): SimResults {
+  const horizon = Math.max(1, inputs.planningAge - inputs.currentAge + 1);
+  const paths: number[][] = [];
+  const spendPaths: number[][] = [];
+  let ruinedPaths = 0;
+  const startingAssets = getInvestableAssets(inputs);
+
+  for (let simulationIndex = 0; simulationIndex < inputs.numSimulations; simulationIndex += 1) {
+    let wealth = Math.max(0, startingAssets);
+    let ruined = false;
+    const path: number[] = [];
+    const spendPath: number[] = [];
+
+    for (let yearIndex = 0; yearIndex < horizon; yearIndex += 1) {
+      const age = inputs.currentAge + yearIndex;
+      const baseReturn = logNormalReturn(inputs.expectedReturn, inputs.volatility);
+      const stressed = stressReturn(baseReturn, inputs, yearIndex, stressScenario);
+      const spending = getSpendingForAge(age, inputs.retirementAge, { ...inputs, inflationRate: stressed.inflationRate });
+
+      if (wealth <= 0) {
+        wealth = 0;
+      } else {
+        wealth = Math.max(0, wealth * (1 + stressed.annualReturn));
+        
+        // Calculate Gross Incomes
+        let annualGrossIncome = salaryIncome(age, inputs.currentAge, inputs.retirementAge, inputs.annualSalary, inputs.inflationRate);
+        annualGrossIncome += inputs.hasSpouse
+          ? salaryIncome(age, inputs.spouseCurrentAge, inputs.spouseRetirementAge, inputs.spouseAnnualSalary, inputs.inflationRate)
+          : 0;
+        annualGrossIncome += socialSecurityIncome(age, inputs);
+        annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, yearIndex) : 0;
+        
+        // Progressive federal tax estimate (MFJ 2024 brackets)
+        // Does not include state tax, FICA, or Medicare surtax
+        // Carried interest distributions handled separately in 
+        // taxableEventAmount() at LTCG rates
+        const effectiveRate = estimateEffectiveTaxRate(annualGrossIncome);
+        wealth += annualGrossIncome * (1 - effectiveRate);
+        
+        wealth += lumpyEventCashFlow(age, inputs.lumpyEvents);
+        wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);
+        wealth -= age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
+        wealth -= yearIndex < inputs.mortgageYearsRemaining ? inputs.mortgageAnnualPayment : 0;
+        wealth -= spending;
+        wealth = Math.max(0, wealth);
+      }
+
+      if (!ruined && age >= inputs.retirementAge && wealth <= 0) ruined = true;
+      path.push(wealth);
+      spendPath.push(spending);
+    }
+
+    if (ruined) ruinedPaths += 1;
+    paths.push(path);
+    spendPaths.push(spendPath);
+  }
+
+  const percentilePaths: PercentilesAtAge[] = Array.from({ length: horizon }, (_, index) => {
+    const values = paths.map((path) => path[index] ?? 0);
+    return {
+      age: inputs.currentAge + index,
+      p10: percentile(values, 10),
+      p25: percentile(values, 25),
+      p50: percentile(values, 50),
+      p75: percentile(values, 75),
+      p90: percentile(values, 90),
+    };
+  });
+  const terminalWealth = paths.map((path) => path[path.length - 1] ?? 0);
+  const ruinProbability = ruinedPaths / inputs.numSimulations;
+  const successRate = 1 - ruinProbability;
+
+  return {
+    paths,
+    percentilePaths,
+    stackedBands: computeStackedBands(paths, startingAssets, inputs.retirementAge, inputs.planningAge),
+    ruinProbability,
+    medianTerminalWealth: percentile(terminalWealth, 50),
+    successRate,
+    verdictText: buildVerdict(inputs, successRate),
+    yearlyMedianSpend: Array.from({ length: horizon }, (_, index) => percentile(spendPaths.map((path) => path[index] ?? 0), 50)),
+  };
+}
+
+export function solveSustainableSpend(inputs: SimInputs, targetSuccessRate = 0.85): number {
+  let low = 25_000;
+  let high = 750_000;
+  for (let i = 0; i < 10; i += 1) {
+    const mid = (low + high) / 2;
+    const result = runSimulation({ ...inputs, spendingGoGo: mid, spendingSlowGo: mid * 0.75, spendingNoGo: mid * 0.6, numSimulations: Math.min(inputs.numSimulations, 500) });
+    if (result.successRate >= targetSuccessRate) low = mid;
+    else high = mid;
+  }
+  return low / 12;
+}
+
+export { getSpendingForAge } from "./spendingSmile";
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\engine\scenarioRunner.ts
+import type { Scenario, SimInputs } from "../types";
+import { runSimulation } from "./monteCarlo";
+
+export function runScenarios(baseInputs: SimInputs, scenarios: Scenario[]): Scenario[] {
+  return scenarios.map((scenario) => {
+    const inputs = { ...baseInputs, ...scenario.inputs };
+    return {
+      ...scenario,
+      results: runSimulation(inputs),
+    };
+  });
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\engine\spendingSmile.ts
+import type { SimInputs } from "../types";
+
+export function getSpendingForAge(age: number, retirementAge: number, inputs: SimInputs): number {
+  if (age < retirementAge) {
+    return 0;
+  }
+
+  const retirementYearIndex = age - retirementAge;
+  const inflationMultiplier = (1 + inputs.inflationRate) ** retirementYearIndex;
+
+  if (retirementYearIndex < inputs.goGoYears) {
+    return inputs.spendingGoGo * inflationMultiplier;
+  }
+
+  if (retirementYearIndex < inputs.goGoYears + inputs.slowGoYears) {
+    return inputs.spendingSlowGo * inflationMultiplier;
+  }
+
+  return (inputs.spendingNoGo + inputs.healthcareSurgeAmount) * inflationMultiplier;
+}
+
+export function buildSpendingSmileSeries(inputs: SimInputs): Array<{ age: number; spending: number }> {
+  return Array.from({ length: inputs.planningAge - inputs.currentAge + 1 }, (_, index) => {
+    const age = inputs.currentAge + index;
+    return {
+      age,
+      spending: getSpendingForAge(age, inputs.retirementAge, inputs),
+    };
+  });
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\engine\taxEngine.ts
+import type { LumpyEvent } from "../types";
+
+export function estimateEventTax(event: LumpyEvent): number {
+  if (event.taxType === "ordinary") {
+    return Math.max(0, event.amount * 0.4);
+  }
+
+  if (event.taxType === "ltcg") {
+    return Math.max(0, event.amount * 0.24);
+  }
+
+  return 0;
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\lib\constants.ts
+import type { SimInputs } from "../types";
+
+export const DEFAULT_INPUTS: SimInputs = {
+  currentAge: 47,
+  retirementAge: 55,
+  planningAge: 92,
+  hasSpouse: true,
+  spouseCurrentAge: 45,
+  spouseRetirementAge: 55,
+  spousePlanningAge: 94,
+  taxableAssets: 2_500_000,
+  taxDeferredAssets: 800_000,
+  taxFreeAssets: 200_000,
+  illiquidAssets: 1_500_000,
+  cashReserves: 350_000,
+  annualSalary: 650_000,
+  spouseAnnualSalary: 225_000,
+  socialSecurityAge: 67,
+  socialSecurityAmount: 48_000,
+  spouseSocialSecurityAge: 67,
+  spouseSocialSecurityAmount: 32_000,
+  otherRetirementIncome: 0,
+  spendingGoGo: 280_000,
+  spendingSlowGo: 200_000,
+  spendingNoGo: 150_000,
+  goGoYears: 10,
+  slowGoYears: 10,
+  healthcareSurgeAmount: 45_000,
+  expectedReturn: 0.07,
+  volatility: 0.15,
+  inflationRate: 0.028,
+  numSimulations: 1000,
+  lumpyEvents: [
+    {
+      id: "carry-1",
+      label: "Carry distribution",
+      year: 52,
+      amount: 1_500_000,
+      probability: 0.7,
+      taxType: "ltcg",
+      confidence: "medium",
+    },
+    {
+      id: "capital-call-1",
+      label: "Capital Call",
+      year: 48,
+      amount: -250000,
+      probability: 1,
+      taxType: "none",
+      confidence: "high",
+    },
+  ],
+  numKids: 2,
+  collegeEvents: [
+    {
+      id: "college-1",
+      childName: "Child 1",
+      startYear: 50,
+      annualCost: 95_000,
+      years: 4,
+      existingSavings529: 180_000,
+    },
+  ],
+  mortgageBalance: 900_000,
+  mortgageAnnualPayment: 96_000,
+  mortgageYearsRemaining: 12,
+  capitalCallObligations: 80_000,
+};
+
+export const HISTORICAL_SCENARIOS = [
+  { name: "Dot-com unwind", startYear: 2000, drawdown: -0.43 },
+  { name: "Global financial crisis", startYear: 2008, drawdown: -0.51 },
+  { name: "Inflation shock", startYear: 1973, drawdown: -0.37 },
+];
+
+export const SSA_MORTALITY_QX: Record<number, number> = {
+  50: 0.0044, 51: 0.0048, 52: 0.0053, 53: 0.0058, 54: 0.0064,
+  55: 0.0071, 56: 0.0078, 57: 0.0086, 58: 0.0095, 59: 0.0105,
+  60: 0.0116, 61: 0.0128, 62: 0.0141, 63: 0.0156, 64: 0.0172,
+  65: 0.019, 66: 0.0209, 67: 0.0231, 68: 0.0255, 69: 0.0281,
+  70: 0.031, 71: 0.0343, 72: 0.0379, 73: 0.0419, 74: 0.0463,
+  75: 0.0512, 76: 0.0566, 77: 0.0626, 78: 0.0692, 79: 0.0765,
+  80: 0.0845, 81: 0.0934, 82: 0.1031, 83: 0.1138, 84: 0.1255,
+  85: 0.1383, 86: 0.1523, 87: 0.1675, 88: 0.184, 89: 0.2018,
+  90: 0.221, 91: 0.2416, 92: 0.2635, 93: 0.2868, 94: 0.3113,
+  95: 0.3369, 96: 0.3633, 97: 0.3902, 98: 0.4172, 99: 0.444,
+  100: 0.47,
+};
+
+export const STRESS_SCENARIOS = [
+  { key: "2008", yearOneReturn: -0.37, yearTwoReturn: 0.265, label: "2008-09 Financial Crisis" },
+  { key: "dotcom", yearOneReturn: -0.09, yearTwoReturn: -0.12, yearThreeReturn: -0.22, label: "2000-02 Dot-com" },
+  { key: "stagflation", overrideInflation: 0.09, overrideReturn: 0.03, years: 10, label: "1970s Stagflation" },
+  { key: "peak", yearOneReturn: -0.45, label: "Retire at Peak (worst case)" },
+  { key: "japan", overrideReturn: 0, overrideInflation: 0.005, years: 10, label: "Japan 1990-2000" },
+] as const;
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\lib\formatters.ts
+export function formatCurrency(value: number, maximumFractionDigits = 0): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits,
+  }).format(value);
+}
+
+export function formatCompactCurrency(value: number): string {
+  const absolute = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+
+  if (absolute >= 1_000_000) {
+    return `${sign}$${(absolute / 1_000_000).toFixed(absolute >= 10_000_000 ? 1 : 2)}M`;
+  }
+
+  if (absolute >= 1_000) {
+    return `${sign}$${Math.round(absolute / 1_000)}K`;
+  }
+
+  return `${sign}$${Math.round(absolute).toLocaleString()}`;
+}
+
+export function formatMillions(value: number): string {
+  return formatCompactCurrency(value);
+}
+
+export function formatPercentage(value: number, maximumFractionDigits = 0): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "percent",
+    maximumFractionDigits,
+  }).format(value);
+}
+
+export function formatAge(age: number): string {
+  return `Age ${Math.round(age)}`;
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\lib\theme.ts
+export type Theme = 'dark' | 'light' | 'sepia';
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\lib\useTheme.ts
+import { useEffect, useState } from 'react';
+import { Theme } from '../lib/theme';
+
+export function useTheme() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('terminus-theme') as Theme) || 'dark';
+    }
+    return 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('terminus-theme', theme);
+    document.documentElement.style.transition = 'all 0.3s ease';
+  }, [theme]);
+
+  return { theme, setTheme };
+}
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\lib\utils.ts
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\store\useSimStore.ts
+import { create } from "zustand";
+import { runSimulation } from "../engine/monteCarlo";
+import { DEFAULT_INPUTS } from "../lib/constants";
+import type { InputErrors, LumpyEvent, Scenario, SimInputs, SimResults } from "../types";
+
+interface SimStore {
+  inputs: SimInputs;
+  results: SimResults | null;
+  scenarios: Scenario[];
+  isRunning: boolean;
+  errors: InputErrors;
+  setInput: <K extends keyof SimInputs>(key: K, value: SimInputs[K]) => void;
+  setInputs: (inputs: Partial<SimInputs>) => void;
+  runSimulation: () => void;
+  addScenario: (scenario: Scenario) => void;
+  addLumpyEvent: (event: LumpyEvent) => void;
+  updateLumpyEvent: (event: LumpyEvent) => void;
+  removeLumpyEvent: (id: string) => void;
+  resetInputs: () => void;
+}
+
+const STORAGE_KEY = 'terminus-inputs-v1';
+
+function loadSavedInputs(): SimInputs {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return DEFAULT_INPUTS;
+    const parsed = JSON.parse(saved);
+    // Merge with defaults to handle new fields added in updates
+    return { ...DEFAULT_INPUTS, ...parsed };
+  } catch {
+    return DEFAULT_INPUTS;
+  }
+}
+
+function saveInputs(inputs: SimInputs): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(inputs));
+  } catch {
+    // Storage full or unavailable â€” fail silently
+  }
+}
+
+let debounceTimer: number | null = null;
+
+export function validateInputs(inputs: SimInputs): InputErrors {
+  const errors: InputErrors = {};
+  const dollarKeys: Array<keyof SimInputs> = [
+    "taxableAssets", "taxDeferredAssets", "taxFreeAssets", "illiquidAssets", "cashReserves",
+    "annualSalary", "spouseAnnualSalary", "socialSecurityAmount", "spouseSocialSecurityAmount",
+    "otherRetirementIncome", "spendingGoGo", "spendingSlowGo", "spendingNoGo", "healthcareSurgeAmount",
+    "mortgageBalance", "mortgageAnnualPayment", "capitalCallObligations",
+  ];
+
+  if (inputs.currentAge < 18 || inputs.currentAge > 80) errors.currentAge = "Current age must be 18-80.";
+  if (inputs.currentAge >= inputs.retirementAge) errors.currentAge = "Current age must be before retirement age.";
+  if (inputs.retirementAge <= inputs.currentAge || inputs.retirementAge >= inputs.planningAge) errors.retirementAge = "Retirement age must be after current age and before planning age.";
+  if (inputs.planningAge < 70 || inputs.planningAge > 100) errors.planningAge = "Planning age must be 70-100.";
+  if (inputs.expectedReturn < 0.01 || inputs.expectedReturn > 0.2) errors.expectedReturn = "Expected return must be 1%-20%.";
+  if (inputs.volatility < 0.01 || inputs.volatility > 0.4) errors.volatility = "Volatility must be 1%-40%.";
+  if (inputs.inflationRate < 0 || inputs.inflationRate > 0.15) errors.inflationRate = "Inflation must be 0%-15%.";
+  if (inputs.numSimulations < 100 || inputs.numSimulations > 5000) errors.numSimulations = "Simulations must be 100-5000.";
+
+  dollarKeys.forEach((key) => {
+    const value = inputs[key];
+    if (typeof value === "number" && value < 0) errors[key] = "Value must be $0 or greater.";
+  });
+
+  return errors;
+}
+
+function hasErrors(errors: InputErrors): boolean {
+  return Object.keys(errors).length > 0;
+}
+
+function scheduleRun(get: () => SimStore, set: (partial: Partial<SimStore>) => void) {
+  const errors = validateInputs(get().inputs);
+  set({ errors });
+  if (hasErrors(errors)) {
+    set({ isRunning: false });
+    return;
+  }
+
+  set({ isRunning: true });
+  saveInputs(get().inputs);
+  if (debounceTimer) window.clearTimeout(debounceTimer);
+  debounceTimer = window.setTimeout(() => {
+    set({ results: runSimulation(get().inputs), isRunning: false });
+  }, 400);
+}
+
+export const useSimStore = create<SimStore>((set, get) => {
+  const initialInputs = loadSavedInputs();
+  const initialErrors = validateInputs(initialInputs);
+  return {
+    inputs: initialInputs,
+    results: hasErrors(initialErrors) ? null : runSimulation(initialInputs),
+    scenarios: [] as Scenario[],
+    isRunning: false,
+    errors: initialErrors,
+    setInput: <K extends keyof SimInputs>(key: K, value: SimInputs[K]) => {
+      set((state) => ({ inputs: { ...state.inputs, [key]: value } }));
+      scheduleRun(get, set);
+    },
+    setInputs: (nextInputs: Partial<SimInputs>) => {
+      set((state) => ({ inputs: { ...state.inputs, ...nextInputs } }));
+      scheduleRun(get, set);
+    },
+    runSimulation: () => {
+      const currentInputs = get().inputs;
+      const validationErrors = validateInputs(currentInputs);
+      if (hasErrors(validationErrors)) {
+        set({ errors: validationErrors, isRunning: false });
+        return;
+      }
+      set({ errors: validationErrors, isRunning: true });
+      set({ results: runSimulation(currentInputs), isRunning: false });
+    },
+    addScenario: (scenario) => set((state) => ({ scenarios: [...state.scenarios, scenario] })),
+    addLumpyEvent: (event) => {
+      set((state) => ({ inputs: { ...state.inputs, lumpyEvents: [...state.inputs.lumpyEvents, event] } }));
+      scheduleRun(get, set);
+    },
+    updateLumpyEvent: (event) => {
+      set((state) => ({
+        inputs: {
+          ...state.inputs,
+          lumpyEvents: state.inputs.lumpyEvents.map((item) => (item.id === event.id ? event : item)),
+        },
+      }));
+      scheduleRun(get, set);
+    },
+    removeLumpyEvent: (id) => {
+      set((state) => ({ 
+        inputs: { 
+          ...state.inputs, 
+          lumpyEvents: state.inputs.lumpyEvents.filter((event) => event.id !== id) 
+        } 
+      }));
+      scheduleRun(get, set);
+    },
+    resetInputs: () => {
+      localStorage.removeItem(STORAGE_KEY);
+      set({ inputs: DEFAULT_INPUTS });
+      scheduleRun(get, set);
+    }
+  };
+});
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\types\index.ts
+export interface SimInputs {
+  currentAge: number;
+  retirementAge: number;
+  planningAge: number;
+  hasSpouse: boolean;
+  spouseCurrentAge: number;
+  spouseRetirementAge: number;
+  spousePlanningAge: number;
+  taxableAssets: number;
+  taxDeferredAssets: number;
+  taxFreeAssets: number;
+  illiquidAssets: number;
+  cashReserves: number;
+  annualSalary: number;
+  spouseAnnualSalary: number;
+  socialSecurityAge: number;
+  socialSecurityAmount: number;
+  spouseSocialSecurityAge: number;
+  spouseSocialSecurityAmount: number;
+  otherRetirementIncome: number;
+  spendingGoGo: number;
+  spendingSlowGo: number;
+  spendingNoGo: number;
+  goGoYears: number;
+  slowGoYears: number;
+  healthcareSurgeAmount: number;
+  expectedReturn: number;
+  volatility: number;
+  inflationRate: number;
+  numSimulations: number;
+  lumpyEvents: LumpyEvent[];
+  numKids: number;
+  collegeEvents: CollegeEvent[];
+  mortgageBalance: number;
+  mortgageAnnualPayment: number;
+  mortgageYearsRemaining: number;
+  capitalCallObligations: number;
+}
+
+export interface LumpyEvent {
+  id: string;
+  label: string;
+  year: number;
+  amount: number;
+  probability: number;
+  taxType: "ordinary" | "ltcg" | "none";
+  confidence: "low" | "medium" | "high";
+}
+
+export interface CollegeEvent {
+  id: string;
+  childName: string;
+  startYear: number;
+  annualCost: number;
+  years: number;
+  existingSavings529: number;
+}
+
+export interface SimResults {
+  paths: number[][];
+  percentilePaths: PercentilesAtAge[];
+  stackedBands: StackedBandDataPoint[];
+  ruinProbability: number;
+  medianTerminalWealth: number;
+  successRate: number;
+  verdictText: string;
+  yearlyMedianSpend: number[];
+}
+
+export interface StackedBandDataPoint {
+  age: number;
+  broke: number;
+  struggling: number;
+  surviving: number;
+  thriving: number;
+  flourishing: number;
+  dead: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+}
+
+export type InputErrors = Partial<Record<keyof SimInputs, string>>;
+
+export interface StressScenario {
+  key: string;
+  label: string;
+  yearOneReturn?: number;
+  yearTwoReturn?: number;
+  yearThreeReturn?: number;
+  overrideInflation?: number;
+  overrideReturn?: number;
+  years?: number;
+}
+
+export interface PercentilesAtAge {
+  age: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+}
+
+export interface Scenario {
+  id: string;
+  name: string;
+  color: string;
+  inputs: Partial<SimInputs>;
+  results?: SimResults;
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\App.tsx
+import { TooltipProvider } from "./components/ui/tooltip";
+import { AppShell } from "./components/layout/AppShell";
+
+export function App() {
+  return (
+    <TooltipProvider>
+      <AppShell />
+    </TooltipProvider>
+  );
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\index.css
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+:root,
+:root[data-theme="dark"] {
+  --bg-primary: #0f1117;
+  --bg-secondary: #161b27;
+  --bg-card: #1a2035;
+  --bg-card-hover: #1f2845;
+  --border: #2d3748;
+  --border-subtle: #1e2a3a;
+  --accent: #14b8a6;
+  --accent-glow: rgba(20, 184, 166, 0.15);
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --scrollbar-thumb: #2d3748;
+  --noise-opacity: 0.03;
+}
+
+:root[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --accent: #0d9488;
+  --accent-glow: rgba(13, 148, 136, 0.10);
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #94a3b8;
+  --scrollbar-thumb: #cbd5e1;
+  --noise-opacity: 0.02;
+}
+
+:root[data-theme="sepia"] {
+  --bg-primary: #1c1510;
+  --bg-secondary: #241d16;
+  --bg-card: #2a211a;
+  --bg-card-hover: #322820;
+  --border: #4a3728;
+  --border-subtle: #3a2d22;
+  --accent: #d4956a;
+  --accent-glow: rgba(212, 149, 106, 0.15);
+  --success: #7fb069;
+  --warning: #e8a838;
+  --danger: #c94040;
+  --text-primary: #f5e6d3;
+  --text-secondary: #d4b896;
+  --text-muted: #8a7260;
+  --scrollbar-thumb: #4a3728;
+  --noise-opacity: 0.04;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  background: #0f1117;
+  color: #f1f5f9;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  transition: background-color 0.3s ease, 
+              color 0.3s ease, 
+              border-color 0.3s ease;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 28rem),
+    linear-gradient(135deg, #0f1117 0%, #101522 48%, #121827 100%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+input[type="number"] {
+  appearance: textfield;
+}
+
+::selection {
+  background: rgba(20, 184, 166, 0.32);
+}
+
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { 
+  background: var(--scrollbar-thumb); 
+  border-radius: 2px; 
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover { 
+  background: var(--accent); 
+}
+.sidebar-scroll { 
+  scrollbar-width: thin; 
+  scrollbar-color: var(--scrollbar-thumb) transparent; 
+}
+
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\main.tsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { App } from "./App";
+import "./index.css";
+
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+
+
+

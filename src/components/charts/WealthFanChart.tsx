@@ -35,6 +35,9 @@ export function WealthFanChart() {
   const setInput = useSimStore((state) => state.setInput);
   const isRunning = useSimStore((state) => state.isRunning);
 
+  const combinedSalary = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
+  const yearsToRetirement = inputs.retirementAge - inputs.currentAge;
+
   const retirementIndex = results?.percentilePaths
     .findIndex(p => p.age === inputs.retirementAge) ?? -1;
   const retirePlusFive = results?.percentilePaths
@@ -146,6 +149,12 @@ export function WealthFanChart() {
           onValueChange={([value]) => setInput("retirementAge", value ?? inputs.retirementAge)}
         />
       </div>
+      <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mt-2">
+        Combined pre-retirement income: {formatCompactCurrency(combinedSalary)}/yr 
+        over {yearsToRetirement} years drives significant accumulation 
+        before retirement. The fan chart shows the full distribution 
+        of {inputs.numSimulations.toLocaleString()} simulated outcomes.
+      </p>
       {sequenceRisk < -0.25 && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm">
           <span className="font-bold text-red-300">

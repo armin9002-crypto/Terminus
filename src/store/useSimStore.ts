@@ -1,3 +1,7 @@
+// Persistence: inputs auto-saved to localStorage on every change
+// Users return to where they left off automatically
+// Reset button clears saved state and restores defaults
+
 import { create } from "zustand";
 import { runSimulation } from "../engine/monteCarlo";
 import { DEFAULT_INPUTS } from "../lib/constants";
