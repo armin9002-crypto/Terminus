@@ -1,7 +1,7 @@
-import { getInvestableAssets } from "@/engine/monteCarlo";
-import { formatCompactCurrency, formatPercentage } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
-import type { SimInputs, SimResults } from "@/types";
+import { getInvestableAssets } from "../../engine/monteCarlo";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { cn } from "../../lib/utils";
+import type { SimInputs, SimResults } from "../../types";
 
 interface HeroVerdictProps {
   inputs: SimInputs;

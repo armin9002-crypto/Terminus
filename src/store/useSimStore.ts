@@ -81,32 +81,5 @@ export const useSimStore = create<SimStore>((set, get) => {
       set((state) => ({ inputs: { ...state.inputs, ...nextInputs } }));
       scheduleRun(get, set);
     },
-    runSimulation: () => {
-      const errors = validateInputs(get().inputs);
-      if (hasErrors(errors)) {
-        set({ errors, isRunning: false });
-        return;
-      }
-      set({ errors, isRunning: true });
-      set({ results: runSimulation(get().inputs), isRunning: false });
-    },
-    addScenario: (scenario) => set((state) => ({ scenarios: [...state.scenarios, scenario] })),
-    addLumpyEvent: (event) => {
-      set((state) => ({ inputs: { ...state.inputs, lumpyEvents: [...state.inputs.lumpyEvents, event] } }));
-      scheduleRun(get, set);
-    },
-    updateLumpyEvent: (event) => {
-      set((state) => ({
-        inputs: {
-          ...state.inputs,
-          lumpyEvents: state.inputs.lumpyEvents.map((item) => (item.id === event.id ? event : item)),
-        },
-      }));
-      scheduleRun(get, set);
-    },
-    removeLumpyEvent: (id) => {
-      set((state) => ({ inputs: { ...state.inputs, lumpyEvents: state.inputs.lumpyEvents.filter((event) => event.id !== id) } }));
-      scheduleRun(get, set);
-    },
   };
 });

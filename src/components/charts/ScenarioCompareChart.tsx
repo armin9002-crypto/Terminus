@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { runSimulation, solveSustainableSpend } from "@/engine/monteCarlo";
-import { formatCompactCurrency, formatPercentage } from "@/lib/formatters";
-import { useSimStore } from "@/store/useSimStore";
+import { runSimulation, solveSustainableSpend } from "../../engine/monteCarlo";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
 
 const scenarios = [
   { name: "Retire at 52", retirementAge: 52, color: "#14b8a6" },
