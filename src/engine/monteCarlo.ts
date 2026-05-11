@@ -298,16 +298,20 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
         annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, yearIndex) : 0;
         
         const isRetired = age >= inputs.retirementAge;
-        const taxResult = calculateTaxes(
-          annualGrossIncome, inputs, isRetired
-        );
-        // During working years: save a % of after-tax income
-        const afterTaxSpendable = taxResult.afterTaxIncome;
-        const savedAmount = isRetired 
-          ? afterTaxSpendable  // in retirement, all income supplements wealth
-          : afterTaxSpendable * inputs.afterTaxSavingsRate;
+        const taxResult = calculateTaxes(annualGrossIncome, inputs, isRetired);
         
-        wealth += isRetired ? afterTaxSpendable : savedAmount;
+        if (isRetired) {
+          // In retirement: all after-tax income supplements the portfolio
+          // (SS, pension, other income reduces portfolio withdrawals)
+          wealth += taxResult.afterTaxIncome;
+        } else {
+          // During accumulation:
+          // 1. Pre-tax savings go directly to wealth pool
+          const preTaxContributions = annualGrossIncome * inputs.preTaxSavingsRate;
+          // 2. After-tax savings from take-home pay
+          const afterTaxSaved = taxResult.afterTaxIncome * inputs.afterTaxSavingsRate;
+          wealth += preTaxContributions + afterTaxSaved;
+        }
         
         wealth += lumpyEventCashFlow(age, inputs.lumpyEvents);
         wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);
@@ -354,6 +358,46 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
   };
 }
 
+export function getAccumulationSummary(inputs: SimInputs): {
+  yearsToRetirement: number;
+  startingAssets: number;
+  estimatedRetirementAssets: number;
+  annualSavings: number;
+  combinedGrossIncome: number;
+  combinedNetIncome: number;
+  preTaxSavings: number;
+  afterTaxSavings: number;
+  effectiveTaxRate: number;
+} {
+  const combinedGross = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
+  const taxResult = calculateTaxes(combinedGross, inputs, false);
+  const preTaxSavings = combinedGross * inputs.preTaxSavingsRate;
+  const afterTaxSavings = taxResult.afterTaxIncome * inputs.afterTaxSavingsRate;
+  const totalAnnualSavings = preTaxSavings + afterTaxSavings;
+  const yearsToRetirement = inputs.retirementAge - inputs.currentAge;
+  
+  // Simple compound growth estimate for display purposes
+  const growthFactor = Math.pow(1 + inputs.expectedReturn, yearsToRetirement);
+  const startingAssets = getInvestableAssets(inputs);
+  
+  // Future value of lump sum + future value of an annuity
+  const estimatedRetirementAssets = 
+    startingAssets * growthFactor + 
+    totalAnnualSavings * ((growthFactor - 1) / inputs.expectedReturn);
+  
+  return {
+    yearsToRetirement,
+    startingAssets,
+    estimatedRetirementAssets,
+    annualSavings: totalAnnualSavings,
+    combinedGrossIncome: combinedGross,
+    combinedNetIncome: taxResult.afterTaxIncome,
+    preTaxSavings,
+    afterTaxSavings,
+    effectiveTaxRate: taxResult.effectiveRate,
+  };
+}
+
 export function solveSustainableSpend(inputs: SimInputs, targetSuccessRate = 0.85): number {
   let low = 25_000;
   let high = 750_000;
@@ -364,6 +408,47 @@ export function solveSustainableSpend(inputs: SimInputs, targetSuccessRate = 0.8
     else high = mid;
   }
   return low / 12;
+}
+
+export function calculateSmartSpendingDefaults(
+  inputs: SimInputs
+): {
+  goGo: number;
+  slowGo: number;
+  noGo: number;
+  basis: string;
+} {
+  const combinedGross = inputs.annualSalary + 
+    (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
+  const taxResult = calculateTaxes(combinedGross, inputs, false);
+  const combinedNetIncome = taxResult.afterTaxIncome;
+  
+  const investable = getInvestableAssets(inputs);
+  
+  // Method A: 65% income replacement
+  const incomeReplacementSpend = combinedNetIncome * 0.65;
+  
+  // Method B: 4.5% of investable assets
+  const assetBasedSpend = investable * 0.045;
+  
+  // Use the lower of the two, floored at $60K, capped at $500K
+  const goGo = Math.max(60000, Math.min(500000,
+    Math.min(incomeReplacementSpend, assetBasedSpend)
+  ));
+  
+  // Round to nearest $5K for cleanliness
+  const roundedGoGo = Math.round(goGo / 5000) * 5000;
+  
+  const basis = assetBasedSpend < incomeReplacementSpend
+    ? 'asset-based (4.5% of investable)'
+    : 'income-based (65% of net income)';
+  
+  return {
+    goGo: roundedGoGo,
+    slowGo: Math.round(roundedGoGo * 0.75 / 5000) * 5000,
+    noGo: Math.round(roundedGoGo * 0.60 / 5000) * 5000,
+    basis,
+  };
 }
 
 export { getSpendingForAge } from "./spendingSmile";

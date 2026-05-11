@@ -3,7 +3,7 @@
 // Reset button clears saved state and restores defaults
 
 import { create } from "zustand";
-import { runSimulation } from "../engine/monteCarlo";
+import { runSimulation, calculateSmartSpendingDefaults } from "../engine/monteCarlo";
 import { DEFAULT_INPUTS } from "../lib/constants";
 import type { InputErrors, LumpyEvent, Scenario, SimInputs, SimResults } from "../types";
 
@@ -21,6 +21,7 @@ interface SimStore {
   updateLumpyEvent: (event: LumpyEvent) => void;
   removeLumpyEvent: (id: string) => void;
   resetInputs: () => void;
+  applySmartSpendingDefaults: () => void;
 }
 
 const STORAGE_KEY = 'terminus-inputs-v1';
@@ -146,6 +147,19 @@ export const useSimStore = create<SimStore>((set, get) => {
     resetInputs: () => {
       localStorage.removeItem(STORAGE_KEY);
       set({ inputs: DEFAULT_INPUTS });
+      scheduleRun(get, set);
+    },
+    applySmartSpendingDefaults: () => {
+      const inputs = get().inputs;
+      const defaults = calculateSmartSpendingDefaults(inputs);
+      set((state) => ({
+        inputs: {
+          ...state.inputs,
+          spendingGoGo: defaults.goGo,
+          spendingSlowGo: defaults.slowGo,
+          spendingNoGo: defaults.noGo,
+        }
+      }));
       scheduleRun(get, set);
     }
   };

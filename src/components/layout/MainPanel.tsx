@@ -6,6 +6,7 @@ import { StressTestChart } from "../../components/charts/StressTestChart";
 import { WealthFanChart } from "../../components/charts/WealthFanChart";
 import { HeroVerdict } from "../../components/dashboard/HeroVerdict";
 import { StatCard } from "../../components/dashboard/StatCard";
+import { TaxBreakdownPanel } from "../../components/dashboard/TaxBreakdownPanel";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
@@ -81,6 +82,7 @@ export function MainPanel() {
               <TabsTrigger value="spending">Spending Plan</TabsTrigger>
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
+              <TabsTrigger value="tax">Tax Breakdown</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-4">
@@ -89,6 +91,7 @@ export function MainPanel() {
             <TabsContent value="spending"><SpendingSmileChart /></TabsContent>
             <TabsContent value="scenarios"><ScenarioCompareChart /></TabsContent>
             <TabsContent value="stress"><StressTestChart /></TabsContent>
+            <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
           </CardContent>
         </Card>
       </Tabs>

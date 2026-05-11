@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getInvestableAssets, solveSustainableSpend } from "../../engine/monteCarlo";
+import { getInvestableAssets, solveSustainableSpend, getAccumulationSummary } from "../../engine/monteCarlo";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
 import { cn } from "../../lib/utils";
 import type { SimInputs, SimResults } from "../../types";
@@ -19,6 +19,7 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
   const successRate = results?.successRate;
   const activeTone = tone(successRate ?? 0);
   
+  const summary = getAccumulationSummary(inputs);
   const [sustainableSpend, setSustainableSpend] = useState<number | null>(null);
 
   useEffect(() => {
@@ -49,9 +50,11 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
             Safe sustainable spend at 85% confidence: 
             {sustainableSpend ? `${formatCompactCurrency(sustainableSpend * 12)}/year | ${formatCompactCurrency(sustainableSpend)}/month` : "--"}
           </p>
-          <p className="mt-3 text-sm text-mutedText">
-            Retiring at {inputs.retirementAge} / {formatCompactCurrency(getInvestableAssets(inputs))} investable /{" "}
-            {inputs.numSimulations.toLocaleString()} simulations / Live model
+          <p className="mt-2 text-sm text-mutedText">
+            Retiring at {inputs.retirementAge} | 
+            {formatCompactCurrency(getInvestableAssets(inputs))} today | 
+            Est. {formatCompactCurrency(summary.estimatedRetirementAssets)} at retirement |
+            Saving {formatCompactCurrency(summary.annualSavings)}/yr
           </p>
         </div>
         <div className="grid grid-cols-3 gap-3">

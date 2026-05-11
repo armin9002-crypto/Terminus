@@ -20,9 +20,9 @@ export const DEFAULT_INPUTS: SimInputs = {
   spouseSocialSecurityAge: 67,
   spouseSocialSecurityAmount: 32400,  // $2,700/month × 12
   otherRetirementIncome: 0,
-  spendingGoGo: 280_000,
-  spendingSlowGo: 200_000,
-  spendingNoGo: 150_000,
+  spendingGoGo: 175_000,
+  spendingSlowGo: 130_000,
+  spendingNoGo: 105_000,
   goGoYears: 10,
   slowGoYears: 10,
   healthcareSurgeAmount: 45_000,
