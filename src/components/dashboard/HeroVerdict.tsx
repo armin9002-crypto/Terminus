@@ -47,7 +47,7 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
           </h1>
           <p className="mt-2 text-sm font-semibold" style={{color: 'var(--accent)'}}>
             Safe sustainable spend at 85% confidence: 
-            {sustainableSpend ? `${formatCompactCurrency(sustainableSpend * 12)}/year · ${formatCompactCurrency(sustainableSpend)}/month` : "--"}
+            {sustainableSpend ? `${formatCompactCurrency(sustainableSpend * 12)}/year | ${formatCompactCurrency(sustainableSpend)}/month` : "--"}
           </p>
           <p className="mt-3 text-sm text-mutedText">
             Retiring at {inputs.retirementAge} / {formatCompactCurrency(getInvestableAssets(inputs))} investable /{" "}
@@ -66,7 +66,7 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
 
 function Pill({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="rounded-lg border border-border bg-[#111827] p-3 text-center">
+    <div className="rounded-lg border border-border bg-[var(--bg-card)] p-3 text-center">
       <p className={cn("text-2xl font-bold transition-all duration-300", className)}>{value}</p>
       <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-mutedText">{label}</p>
     </div>

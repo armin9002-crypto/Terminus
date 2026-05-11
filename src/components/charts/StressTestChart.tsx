@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { STRESS_SCENARIOS } from "../../lib/constants";
 import { runSimulation } from "../../engine/monteCarlo";
@@ -59,7 +60,7 @@ export function StressTestChart() {
 
   return (
     <div className="overflow-hidden rounded-lg border border-border">
-      <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr] bg-[#111827] p-3 text-xs font-bold uppercase tracking-[0.16em] text-mutedText">
+      <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr] bg-[var(--bg-secondary)] p-3 text-xs font-bold uppercase tracking-[0.16em] text-mutedText">
         <span>Scenario</span><span>Success</span><span>Median</span><span>10th pct.</span>
       </div>
       {rows.map((row) => (

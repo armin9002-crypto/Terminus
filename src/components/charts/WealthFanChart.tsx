@@ -79,7 +79,7 @@ export function WealthFanChart() {
             <Tooltip
               cursor={{ stroke: "#14b8a6", strokeOpacity: 0.35 }}
               contentStyle={{
-                background: "#111827",
+                background: "var(--bg-card)",
                 border: "1px solid #2d3748",
                 borderRadius: 8,
                 color: "#f1f5f9",
@@ -136,7 +136,7 @@ export function WealthFanChart() {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <div className="rounded-md border border-border bg-[#111827] p-3">
+      <div className="rounded-md border border-border bg-[var(--bg-card)] p-3">
         <div className="mb-2 flex items-center justify-between text-xs">
           <span className="font-semibold uppercase tracking-[0.18em] text-mutedText">Drag retirement marker</span>
           <span className="font-semibold text-warning">Age {inputs.retirementAge}</span>
@@ -158,13 +158,13 @@ export function WealthFanChart() {
       {sequenceRisk < -0.25 && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm">
           <span className="font-bold text-red-300">
-            ⚠️ Sequence of Returns Risk Detected
+            WARNING: Sequence of Returns Risk Detected
           </span>
           <p className="mt-1 text-[var(--text-muted)]">
             In the worst 10% of scenarios, your portfolio drops 
             {Math.abs(sequenceRisk * 100).toFixed(0)}% in the 
             first 5 years of retirement. A market downturn early 
-            in retirement is especially damaging — consider 
+            in retirement is especially damaging -- consider 
             maintaining 2 years of cash reserves as a buffer.
           </p>
         </div>

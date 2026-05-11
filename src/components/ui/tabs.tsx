@@ -6,7 +6,7 @@ export const Tabs = TabsPrimitive.Root;
 export function TabsList({ className, ...props }: TabsPrimitive.TabsListProps) {
   return (
     <TabsPrimitive.List
-      className={cn("inline-flex rounded-md border border-border bg-[#111827] p-1", className)}
+      className={cn("inline-flex rounded-md border border-border bg-[var(--bg-secondary)] p-1", className)}
       {...props}
     />
   );

@@ -261,10 +261,10 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">Quick Add</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: '💰 Carry', type: 'carry', sub: 'LTCG Taxed' },
-                    { label: '🏠 RE Sale', type: 're', sub: 'LTCG Taxed' },
-                    { label: '📈 Bonus', type: 'bonus', sub: 'Ordinary Tax' },
-                    { label: '💸 Cap Call', type: 'call', sub: 'Outflow' },
+                    { label: 'Carry', type: 'carry', sub: 'LTCG Taxed' },
+                    { label: 'RE Sale', type: 're', sub: 'LTCG Taxed' },
+                    { label: 'Bonus', type: 'bonus', sub: 'Ordinary Tax' },
+                    { label: 'Cap Call', type: 'call', sub: 'Outflow' },
                   ].map(btn => (
                     <button
                       key={btn.type}

@@ -39,7 +39,7 @@ export function SpendingSmileChart() {
           <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
           <YAxis tickFormatter={formatCompactCurrency} tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} width={80} />
           <Tooltip
-            contentStyle={{ background: "#111827", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
+            contentStyle={{ background: "var(--bg-card)", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
             formatter={(value) => [formatCompactCurrency(Number(value)), "Median spend"]}
             labelFormatter={(age) => `Age ${age}`}
           />

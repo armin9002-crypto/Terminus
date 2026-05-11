@@ -50,14 +50,29 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
               "text-[10px] font-bold transition-opacity duration-500",
               impact.delta > 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
             )}>
-              {impact.delta > 0 ? "↑" : "↓"} {Math.abs(impact.delta * 100).toFixed(1)}%
+              {impact.delta > 0 ? "(+)" : "(-)"} {Math.abs(impact.delta * 100).toFixed(1)}%
             </span>
           )}
         </div>
         <input 
           type="text"
-          value={format === "currency" ? `$${value.toLocaleString()}` : value}
-          onChange={(e) => onChange(Number(e.target.value.replace(/[^0-9.-]+/g, "")))}
+          value={
+            format === "currency" 
+              ? `$${value.toLocaleString()}` 
+              : format === "percent" 
+                ? (value * 100).toFixed(2)
+                : String(value)
+          }
+          onChange={(e) => {
+            const raw = Number(e.target.value.replace(/[^0-9.-]+/g, ""));
+            if (format === "percent") {
+              onChange(raw / 100);
+            } else if (format === "currency") {
+              onChange(raw);
+            } else {
+              onChange(raw);
+            }
+          }}
           onFocus={(e) => e.target.select()}
           className="w-24 bg-transparent text-right font-mono text-[15px] font-medium text-[var(--accent)] outline-none focus:shadow-[0_0_0_2px_var(--accent-glow)] rounded px-1"
         />

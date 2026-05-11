@@ -41,7 +41,7 @@ function saveInputs(inputs: SimInputs): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(inputs));
   } catch {
-    // Storage full or unavailable — fail silently
+    // Storage full or unavailable -- fail silently
   }
 }
 

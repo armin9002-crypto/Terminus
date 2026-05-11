@@ -15,7 +15,7 @@ function PercentTooltip({ active, payload, label }: { active?: boolean; payload?
   if (!active || !payload) return null;
   const values = new Map(payload.map((item) => [item.dataKey, Number(item.value ?? 0)]));
   return (
-    <div className="rounded-lg border border-border bg-[#1e293b] p-3 text-sm text-primaryText shadow-xl">
+    <div className="rounded-lg border border-border bg-[var(--bg-card)] p-3 text-sm text-primaryText shadow-xl">
       <p className="font-semibold">Age {label}</p>
       <div className="my-2 h-px bg-border" />
       {[...bands].reverse().map((band) => (
@@ -43,7 +43,7 @@ export function RichBrokeDeadChart() {
 
   if (isRunning) {
     return (
-      <div className="h-[540px] animate-pulse rounded-lg border border-border bg-[#111827] p-6">
+      <div className="h-[540px] animate-pulse rounded-lg border border-border bg-[var(--bg-card)] p-6">
         <div className="h-full rounded-md bg-slate-700/40" />
       </div>
     );

@@ -1,6 +1,7 @@
 import { HelpCircle, Menu, Share2, X } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "../../lib/useTheme";
+import { Theme } from "../../lib/theme";
 import { Button } from "../../components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { formatCompactCurrency } from "../../lib/formatters";
@@ -17,6 +18,19 @@ export function AppShell() {
   const numSimulations = useSimStore((state) => state.inputs.numSimulations);
   const resetInputs = useSimStore(state => state.resetInputs);
 
+  const themeOrder = ['dark', 'light', 'sepia'] as const;
+  const themeLabels: Record<string, string> = {
+    dark: 'Dark',
+    light: 'Light', 
+    sepia: 'Sepia'
+  };
+
+  const cycleTheme = () => {
+    const currentIndex = themeOrder.indexOf(theme);
+    const nextIndex = (currentIndex + 1) % themeOrder.length;
+    setTheme(themeOrder[nextIndex]);
+  };
+
   return (
     <div className="min-h-screen bg-background text-primaryText">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-xl">
@@ -25,21 +39,21 @@ export function AppShell() {
             <p className="bg-gradient-to-r from-teal-400 to-blue-400 bg-clip-text text-lg font-extrabold uppercase tracking-widest text-transparent">Terminus</p>
           </div>
 
-          <div className="hidden items-center gap-1 md:flex">
-            {(['dark', 'light', 'sepia'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTheme(t)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
-                  theme === t 
-                    ? 'bg-[var(--accent)] text-white' 
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {t === 'dark' ? '🌙 Dark' : t === 'light' ? '☀️ Light' : '📜 Sepia'}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={cycleTheme}
+            title={`Current theme: ${theme}. Click to cycle.`}
+            className="hidden md:flex items-center gap-1.5 rounded-full 
+              border border-[var(--border)] px-3 py-1 text-xs font-semibold 
+              text-[var(--text-muted)] hover:border-[var(--accent)] 
+              hover:text-[var(--accent)] transition-all"
+          >
+            <span className="h-2 w-2 rounded-full" style={{
+              background: theme === 'dark' ? '#14b8a6' 
+                : theme === 'light' ? '#0d9488' 
+                : '#d4956a'
+            }} />
+            {themeLabels[theme]}
+          </button>
 
           <div className="flex items-center gap-2">
             <Button 

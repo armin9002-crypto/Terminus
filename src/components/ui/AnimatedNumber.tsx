@@ -48,7 +48,7 @@ export const AnimatedNumber = React.memo(({
   }, [value, duration]);
 
   const formatted = () => {
-    if (!Number.isFinite(displayValue)) return '—';
+    if (!Number.isFinite(displayValue)) return '--';
     switch (format) {
       case 'currency':
         return formatCompactCurrency(displayValue);

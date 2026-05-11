@@ -74,7 +74,7 @@ export function ScenarioCompareChart() {
 
   return (
     <div className="grid gap-4">
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-[#111827] p-3">
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-[var(--bg-card)] p-3">
         <span className="text-sm font-semibold text-primaryText">What if carry never comes?</span>
         <button className="rounded-full border border-border px-3 py-1 text-sm text-mutedText" onClick={() => setNoCarry((value) => !value)}>
           {noCarry ? "No carry" : "Base carry"}
@@ -82,7 +82,7 @@ export function ScenarioCompareChart() {
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {scenarioResults.map((scenario) => (
-          <div key={scenario.name} className="rounded-lg border border-border bg-[#111827] p-4">
+          <div key={scenario.name} className="rounded-lg border border-border bg-[var(--bg-card)] p-4">
             <p className="text-sm font-semibold text-primaryText">{scenario.name}</p>
             <p className="mt-3 text-3xl font-bold" style={{ color: scenario.color }}>{formatPercentage(scenario.result.successRate, 0)}</p>
             <p className="mt-1 text-xs text-mutedText">Success rate</p>
