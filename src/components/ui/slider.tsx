@@ -11,7 +11,7 @@ export const Slider = React.forwardRef<React.ElementRef<typeof SliderPrimitive.R
       className={cn("relative flex h-5 w-full touch-none select-none items-center", className)}
       {...props}
     >
-      <SliderPrimitive.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-slate-700">
+      <SliderPrimitive.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-[var(--border)]">
         <SliderPrimitive.Range className="absolute h-full bg-accent" />
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb className="block size-4 rounded-full border border-accent bg-primaryText shadow-lg shadow-accent/20 focus:outline-none focus:ring-2 focus:ring-accent" />

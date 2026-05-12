@@ -2,6 +2,7 @@ import { PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
 import { RichBrokeDeadChart } from "../../components/charts/RichBrokeDeadChart";
 import { CarryAwardsChart } from "../../components/charts/CarryAwardsChart";
 import { ScenarioCompareChart } from "../../components/charts/ScenarioCompareChart";
+import { InfoPage } from "../../components/layout/InfoPage";
 import { SpendingSmileChart } from "../../components/charts/SpendingSmileChart";
 import { StressTestChart } from "../../components/charts/StressTestChart";
 import { WealthFanChart } from "../../components/charts/WealthFanChart";
@@ -81,6 +82,7 @@ export function MainPanel() {
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Tax Breakdown</TabsTrigger>
               <TabsTrigger value="carry">Carry Awards</TabsTrigger>
+              <TabsTrigger value="info">How It Works</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-3">
@@ -91,6 +93,7 @@ export function MainPanel() {
             <TabsContent value="stress"><StressTestChart /></TabsContent>
             <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
             <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
+            <TabsContent value="info"><InfoPage /></TabsContent>
           </CardContent>
         </Card>
       </Tabs>

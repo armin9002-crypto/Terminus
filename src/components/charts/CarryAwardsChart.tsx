@@ -44,6 +44,74 @@ function computeAwardTimeline(award: CarryAward, stateIncomeTaxRate: number): Aw
   });
 }
 
+interface AggregateYear {
+  calYear: number;
+  netDistribution: number;
+  gpCommit: number;
+  cumulativeNet: number;
+}
+
+function computeAggregateTimeline(
+  awards: CarryAward[],
+  stateIncomeTaxRate: number
+): AggregateYear[] {
+  if (awards.length === 0) return [];
+  const taxRate = Math.min(FEDERAL_LTCG + NIIT + stateIncomeTaxRate, 0.55);
+  const minYear = Math.min(...awards.map((a) => a.vintageYear));
+  const maxYear = Math.max(...awards.map((a) => a.vintageYear + 11));
+  let cumulative = 0;
+  const result: AggregateYear[] = [];
+  for (let year = minYear; year <= maxYear; year++) {
+    let netDist = 0;
+    let gpCommit = 0;
+    for (const award of awards) {
+      const fundYear = year - award.vintageYear + 1;
+      if (fundYear >= 1 && fundYear <= 3) {
+        gpCommit -= (award.totalPoolValue * award.gpCommitPercent) / 3;
+      }
+      if (fundYear >= 1 && fundYear <= 12) {
+        const curvePct = CARRY_DISTRIBUTION_CURVE[fundYear - 1] ?? 0;
+        const gross =
+          award.totalPoolValue *
+          award.poolValueCapture *
+          award.vestedPercent *
+          curvePct;
+        netDist += gross * (1 - taxRate);
+      }
+    }
+    cumulative += netDist + gpCommit;
+    result.push({ calYear: year, netDistribution: netDist, gpCommit, cumulativeNet: cumulative });
+  }
+  return result;
+}
+
+interface CustomTickProps {
+  x?: number;
+  y?: number;
+  payload?: { value: number };
+  chartData: AwardYear[];
+}
+
+function AwardXTick({ x = 0, y = 0, payload, chartData }: CustomTickProps) {
+  const point = payload ? chartData.find((d) => d.calYear === payload.value) : undefined;
+  const curvePct = point
+    ? (CARRY_DISTRIBUTION_CURVE[point.fundYear - 1] ?? 0) * 100
+    : 0;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={12} textAnchor="middle" fill="#94a3b8" fontSize={10}>
+        {payload?.value}
+      </text>
+      <text x={0} y={0} dy={24} textAnchor="middle" fill="#64748b" fontSize={9}>
+        {point ? `FY${point.fundYear}` : ""}
+      </text>
+      <text x={0} y={0} dy={35} textAnchor="middle" fill="#4b8b7a" fontSize={9}>
+        {point && curvePct > 0 ? `${curvePct.toFixed(1)}%` : ""}
+      </text>
+    </g>
+  );
+}
+
 export function CarryAwardsChart() {
   const inputs = useSimStore((state) => state.inputs);
 
@@ -60,14 +128,95 @@ export function CarryAwardsChart() {
   }
 
   const effectiveLtcgRate = Math.min(FEDERAL_LTCG + NIIT + inputs.stateIncomeTaxRate, 0.55);
+  const aggregateData = computeAggregateTimeline(inputs.carryAwards, inputs.stateIncomeTaxRate);
+
+  const totalNetAll = inputs.carryAwards.reduce((sum, a) => {
+    const gross = a.totalPoolValue * a.poolValueCapture * a.vestedPercent;
+    return sum + gross * (1 - effectiveLtcgRate);
+  }, 0);
+  const totalGPAll = inputs.carryAwards.reduce(
+    (sum, a) => sum + a.totalPoolValue * a.gpCommitPercent,
+    0
+  );
 
   return (
     <div className="grid gap-6">
+
+      {/* -- AGGREGATE SECTION -- */}
+      <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-card)] p-4 grid gap-4">
+        <div>
+          <p className="text-sm font-bold text-[var(--text-primary)]">All Carry Awards -- Combined</p>
+          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+            {inputs.carryAwards.length} award{inputs.carryAwards.length !== 1 ? "s" : ""} |{" "}
+            {formatPercentage(effectiveLtcgRate, 1)} effective LTCG rate
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Total Net Carry", value: formatCompactCurrency(totalNetAll), color: "text-[var(--success)]" },
+            { label: "Total GP Commit", value: `-${formatCompactCurrency(totalGPAll)}`, color: "text-[var(--danger)]" },
+            {
+              label: "Net Cash",
+              value: formatCompactCurrency(totalNetAll - totalGPAll),
+              color: (totalNetAll - totalGPAll) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]",
+            },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] p-2 text-center">
+              <p className={`text-sm font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
+              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-widest">
+                {stat.label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="h-[220px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={aggregateData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+              <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
+              <XAxis
+                dataKey="calYear"
+                tick={{ fill: "#94a3b8", fontSize: 10 }}
+                tickLine={false}
+                axisLine={{ stroke: "#2d3748" }}
+              />
+              <YAxis
+                tickFormatter={formatCompactCurrency}
+                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                width={72}
+              />
+              <Tooltip
+                contentStyle={{ background: "var(--bg-card)", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
+                formatter={(value, name) => [formatCompactCurrency(Number(value)), name]}
+                labelFormatter={(year) => `${year}`}
+              />
+              <ReferenceLine y={0} stroke="#64748b" strokeOpacity={0.5} />
+              <Bar dataKey="gpCommit" name="GP Commit (outflow)" fill="#dc2626" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="netDistribution" name="Net Distribution" fill="#16a34a" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
+              <Line dataKey="cumulativeNet" name="Cumulative Net" stroke="#14b8a6" strokeWidth={2} dot={false} type="monotone" />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* -- DIVIDER -- */}
+      {inputs.carryAwards.length > 0 && (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-[var(--border)]" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+            Individual Awards
+          </span>
+          <div className="flex-1 h-px bg-[var(--border)]" />
+        </div>
+      )}
+
+      {/* -- INDIVIDUAL AWARD CARDS -- */}
       {inputs.carryAwards.map((award) => {
         const data = computeAwardTimeline(award, inputs.stateIncomeTaxRate);
-
-        const totalGross =
-          award.totalPoolValue * award.poolValueCapture * award.vestedPercent;
+        const totalGross = award.totalPoolValue * award.poolValueCapture * award.vestedPercent;
         const totalNet = totalGross * (1 - effectiveLtcgRate);
         const totalGPCommit = award.totalPoolValue * award.gpCommitPercent;
         const netCash = totalNet - totalGPCommit;
@@ -75,19 +224,16 @@ export function CarryAwardsChart() {
         const peakYears = `${award.vintageYear + 6}-${award.vintageYear + 8}`;
 
         return (
-          <div
-            key={award.id}
-            className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4 grid gap-4"
-          >
-            {/* Header */}
+          <div key={award.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4 grid gap-4">
             <div>
               <p className="text-sm font-bold text-[var(--text-primary)]">{award.label}</p>
               <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                Vintage {award.vintageYear} | {formatPercentage(award.vestedPercent, 0)} vested | {formatPercentage(award.poolValueCapture, 0)} capture | {formatPercentage(effectiveLtcgRate, 1)} effective LTCG rate
+                Vintage {award.vintageYear} | {formatPercentage(award.vestedPercent, 0)} vested |{" "}
+                {formatPercentage(award.poolValueCapture, 0)} capture |{" "}
+                {formatPercentage(effectiveLtcgRate, 1)} LTCG rate
               </p>
             </div>
 
-            {/* Summary stats */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
                 { label: "Effective Pool", value: formatCompactCurrency(totalGross), color: "" },
@@ -121,16 +267,17 @@ export function CarryAwardsChart() {
               ))}
             </div>
 
-            {/* Distribution timeline chart */}
-            <div className="h-[220px]">
+            <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 20, left: 8 }}>
                   <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
                   <XAxis
                     dataKey="calYear"
-                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    height={50}
+                    tick={(props) => <AwardXTick {...props} chartData={data} />}
                     tickLine={false}
                     axisLine={{ stroke: "#2d3748" }}
+                    interval={0}
                   />
                   <YAxis
                     tickFormatter={formatCompactCurrency}
@@ -147,7 +294,10 @@ export function CarryAwardsChart() {
                       color: "#f1f5f9",
                     }}
                     formatter={(value, name) => [formatCompactCurrency(Number(value)), name]}
-                    labelFormatter={(year) => `${year} (Fund Year ${data.find((d) => d.calYear === Number(year))?.fundYear ?? ""})`}
+                    labelFormatter={(year) => {
+                      const point = data.find((d) => d.calYear === Number(year));
+                      return `${year} (Fund Year ${point?.fundYear ?? ""})`;
+                    }}
                   />
                   <ReferenceLine y={0} stroke="#64748b" strokeOpacity={0.5} />
                   <Bar

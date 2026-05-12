@@ -3,7 +3,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "..
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { AgeInput } from "../../components/inputs/AgeInput";
 import { CurrencyInput } from "../../components/inputs/CurrencyInput";
 import { SliderInput } from "../../components/inputs/SliderInput";
@@ -22,7 +21,6 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const inputs = useSimStore((state) => state.inputs);
   const errors = useSimStore((state) => state.errors);
   const setInput = useSimStore((state) => state.setInput);
-  const setInputs = useSimStore((state) => state.setInputs);
   const addCarryAward = useSimStore((state) => state.addCarryAward);
   const updateCarryAward = useSimStore((state) => state.updateCarryAward);
   const removeCarryAward = useSimStore((state) => state.removeCarryAward);
