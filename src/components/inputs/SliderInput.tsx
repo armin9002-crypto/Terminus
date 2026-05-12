@@ -41,10 +41,10 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
   };
 
   return (
-    <div className="grid gap-1 py-1">
+    <div className="grid gap-0.5 py-0.5">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
             {label}
           </span>
           {impact.visible && (
@@ -105,11 +105,6 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
           onValueChange={([next]) => onChange(next ?? value)}
           className="relative flex items-center select-none touch-none w-full h-4"
         />
-
-        <div className="flex justify-between px-0.5 text-[9px] text-[var(--text-muted)] mt-0.5">
-          <span>{formattedValue(min)}</span>
-          <span>{formattedValue(max)}</span>
-        </div>
       </div>
 
       {error && (

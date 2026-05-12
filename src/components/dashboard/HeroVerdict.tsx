@@ -35,29 +35,29 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
   }, [results?.successRate, inputs.retirementAge, inputs.planningAge, inputs.taxableAssets, inputs.taxDeferredAssets, inputs.taxFreeAssets]);
 
   return (
-    <section className={cn("min-h-[120px] rounded-lg border border-border border-l-4 bg-card p-5 shadow-terminal", activeTone.border)}>
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)] lg:items-center">
+    <section className={cn("rounded-lg border border-border border-l-4 bg-card p-4 shadow-terminal", activeTone.border)}>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,0.9fr)] lg:items-center">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-mutedText">Live verdict</p>
-          <h1 className="mt-2 text-[22px] font-bold leading-tight text-primaryText md:text-3xl">
+          <h1 className="mt-1.5 text-[20px] font-bold leading-tight text-primaryText md:text-2xl">
             You can sustain {formatCompactCurrency(inputs.spendingGoGo)}/year with{" "}
             <span className={cn("transition-all duration-300", activeTone.text)}>
               {successRate === undefined ? "--" : formatPercentage(successRate, 0)}
             </span>{" "}
             confidence through age {inputs.planningAge}
           </h1>
-          <p className="mt-2 text-sm font-semibold" style={{color: 'var(--accent)'}}>
+          <p className="mt-1 text-xs font-semibold" style={{color: 'var(--accent)'}}>
             Safe sustainable spend at 85% confidence: 
             {sustainableSpend ? `${formatCompactCurrency(sustainableSpend * 12)}/year | ${formatCompactCurrency(sustainableSpend)}/month` : "--"}
           </p>
-          <p className="mt-2 text-sm text-mutedText">
+          <p className="mt-1 text-xs text-mutedText">
             Retiring at {inputs.retirementAge} | 
             {formatCompactCurrency(getInvestableAssets(inputs))} today | 
             Est. {formatCompactCurrency(summary.estimatedRetirementAssets)} at retirement |
             Saving {formatCompactCurrency(summary.annualSavings)}/yr
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           <Pill label="Success Rate" value={successRate === undefined ? "--" : formatPercentage(successRate, 0)} className={activeTone.text} />
           <Pill label="Median Terminal" value={results ? formatCompactCurrency(results.medianTerminalWealth) : "--"} />
           <Pill label="Ruin Prob." value={results ? formatPercentage(results.ruinProbability, 0) : "--"} className={results && results.ruinProbability > 0.2 ? "text-danger" : ""} />
@@ -69,9 +69,9 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
 
 function Pill({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="rounded-lg border border-border bg-[var(--bg-card)] p-3 text-center">
-      <p className={cn("text-2xl font-bold transition-all duration-300", className)}>{value}</p>
-      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-mutedText">{label}</p>
+    <div className="rounded-lg border border-border bg-[var(--bg-card)] px-2 py-2 text-center">
+      <p className={cn("text-xl font-bold transition-all duration-300", className)}>{value}</p>
+      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.10em] text-mutedText">{label}</p>
     </div>
   );
 }

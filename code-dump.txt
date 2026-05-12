@@ -1,4 +1,230 @@
-﻿// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\ProbabilityGauge.tsx
+﻿// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\CarryAwardsChart.tsx
+import {
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { CARRY_DISTRIBUTION_CURVE } from "../../lib/constants";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+import type { CarryAward } from "../../types";
+
+const FEDERAL_LTCG = 0.20;
+const NIIT = 0.038;
+
+interface AwardYear {
+  calYear: number;
+  fundYear: number;
+  grossDistribution: number;
+  netDistribution: number;
+  gpCommit: number;
+  cumulativeNet: number;
+}
+
+function computeAwardTimeline(award: CarryAward, stateIncomeTaxRate: number): AwardYear[] {
+  const taxRate = Math.min(FEDERAL_LTCG + NIIT + stateIncomeTaxRate, 0.55);
+  let cumulative = 0;
+
+  return CARRY_DISTRIBUTION_CURVE.map((curvePct, i) => {
+    const fundYear = i + 1;
+    const calYear = award.vintageYear + i;
+    const gross =
+      award.totalPoolValue * award.poolValueCapture * award.vestedPercent * curvePct;
+    const net = gross * (1 - taxRate);
+    const gpCommit =
+      fundYear <= 3 ? -((award.totalPoolValue * award.gpCommitPercent) / 3) : 0;
+    cumulative += net + gpCommit;
+
+    return { calYear, fundYear, grossDistribution: gross, netDistribution: net, gpCommit, cumulativeNet: cumulative };
+  });
+}
+
+export function CarryAwardsChart() {
+  const inputs = useSimStore((state) => state.inputs);
+
+  if (inputs.carryAwards.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <p className="text-sm font-semibold text-[var(--text-muted)]">No carry awards added yet.</p>
+        <p className="text-xs text-[var(--text-muted)] mt-2 max-w-xs">
+          Add carry awards in the sidebar to model PE carry distributions
+          and GP commit outflows across your simulation.
+        </p>
+      </div>
+    );
+  }
+
+  const effectiveLtcgRate = Math.min(FEDERAL_LTCG + NIIT + inputs.stateIncomeTaxRate, 0.55);
+
+  return (
+    <div className="grid gap-6">
+      {inputs.carryAwards.map((award) => {
+        const data = computeAwardTimeline(award, inputs.stateIncomeTaxRate);
+
+        const totalGross =
+          award.totalPoolValue * award.poolValueCapture * award.vestedPercent;
+        const totalNet = totalGross * (1 - effectiveLtcgRate);
+        const totalGPCommit = award.totalPoolValue * award.gpCommitPercent;
+        const netCash = totalNet - totalGPCommit;
+        const firstDistYear = award.vintageYear + 2;
+        const peakYears = `${award.vintageYear + 6}-${award.vintageYear + 8}`;
+
+        return (
+          <div
+            key={award.id}
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4 grid gap-4"
+          >
+            {/* Header */}
+            <div>
+              <p className="text-sm font-bold text-[var(--text-primary)]">{award.label}</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                Vintage {award.vintageYear} | {formatPercentage(award.vestedPercent, 0)} vested | {formatPercentage(award.poolValueCapture, 0)} capture | {formatPercentage(effectiveLtcgRate, 1)} effective LTCG rate
+              </p>
+            </div>
+
+            {/* Summary stats */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { label: "Effective Pool", value: formatCompactCurrency(totalGross), color: "" },
+                {
+                  label: "Net After Tax",
+                  value: formatCompactCurrency(totalNet),
+                  color: "text-[var(--success)]",
+                },
+                {
+                  label: "Total GP Commit",
+                  value: `-${formatCompactCurrency(totalGPCommit)}`,
+                  color: "text-[var(--danger)]",
+                },
+                {
+                  label: "Net Cash",
+                  value: formatCompactCurrency(netCash),
+                  color: netCash >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] p-2 text-center"
+                >
+                  <p className={`text-sm font-bold tabular-nums ${stat.color || "text-[var(--text-primary)]"}`}>
+                    {stat.value}
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-widest">
+                    {stat.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Distribution timeline chart */}
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                  <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
+                  <XAxis
+                    dataKey="calYear"
+                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={{ stroke: "#2d3748" }}
+                  />
+                  <YAxis
+                    tickFormatter={formatCompactCurrency}
+                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={72}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--bg-card)",
+                      border: "1px solid #2d3748",
+                      borderRadius: 8,
+                      color: "#f1f5f9",
+                    }}
+                    formatter={(value, name) => [formatCompactCurrency(Number(value)), name]}
+                    labelFormatter={(year) => `${year} (Fund Year ${data.find((d) => d.calYear === Number(year))?.fundYear ?? ""})`}
+                  />
+                  <ReferenceLine y={0} stroke="#64748b" strokeOpacity={0.5} />
+                  <Bar
+                    dataKey="gpCommit"
+                    name="GP Commit (outflow)"
+                    fill="#dc2626"
+                    fillOpacity={0.75}
+                    radius={[2, 2, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="netDistribution"
+                    name="Net Distribution"
+                    fill="#16a34a"
+                    fillOpacity={0.85}
+                    radius={[2, 2, 0, 0]}
+                  />
+                  <Line
+                    dataKey="cumulativeNet"
+                    name="Cumulative Net Cash"
+                    stroke="#14b8a6"
+                    strokeWidth={2}
+                    dot={false}
+                    type="monotone"
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Timeline annotation */}
+            <p className="text-[10px] text-[var(--text-muted)]">
+              First distribution {firstDistYear} | Peak distributions {peakYears} | GP commit called {award.vintageYear}-{award.vintageYear + 2}
+            </p>
+          </div>
+        );
+      })}
+
+      {/* Aggregate summary if multiple awards */}
+      {inputs.carryAwards.length > 1 && (() => {
+        const totalNetAll = inputs.carryAwards.reduce((sum, a) => {
+          const gross = a.totalPoolValue * a.poolValueCapture * a.vestedPercent;
+          return sum + gross * (1 - effectiveLtcgRate);
+        }, 0);
+        const totalGPAll = inputs.carryAwards.reduce(
+          (sum, a) => sum + a.totalPoolValue * a.gpCommitPercent,
+          0
+        );
+        return (
+          <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-4">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">
+              All Awards Combined
+            </p>
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div>
+                <p className="text-[var(--success)] font-bold">{formatCompactCurrency(totalNetAll)}</p>
+                <p className="text-[10px] text-[var(--text-muted)]">Total Net Carry</p>
+              </div>
+              <div>
+                <p className="text-[var(--danger)] font-bold">-{formatCompactCurrency(totalGPAll)}</p>
+                <p className="text-[10px] text-[var(--text-muted)]">Total GP Commit</p>
+              </div>
+              <div>
+                <p className={`font-bold ${(totalNetAll - totalGPAll) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
+                  {formatCompactCurrency(totalNetAll - totalGPAll)}
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)]">Net Cash All Awards</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\ProbabilityGauge.tsx
 import { formatPercentage } from "../../lib/formatters";
 import { cn } from "../../lib/utils";
 
@@ -180,7 +406,7 @@ export function ScenarioCompareChart() {
 
   useEffect(() => {
     setLoading(true);
-    const baseInputs = noCarry ? { ...inputs, lumpyEvents: [] } : inputs;
+    const baseInputs = noCarry ? { ...inputs, carryAwards: [] } : inputs;
     const reducedInputs = { ...baseInputs, numSimulations: Math.min(baseInputs.numSimulations, 750) };
     
     let index = 0;
@@ -1388,6 +1614,7 @@ export function AppShell() {
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\MainPanel.tsx
 import { PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
 import { RichBrokeDeadChart } from "../../components/charts/RichBrokeDeadChart";
+import { CarryAwardsChart } from "../../components/charts/CarryAwardsChart";
 import { ScenarioCompareChart } from "../../components/charts/ScenarioCompareChart";
 import { SpendingSmileChart } from "../../components/charts/SpendingSmileChart";
 import { StressTestChart } from "../../components/charts/StressTestChart";
@@ -1471,6 +1698,7 @@ export function MainPanel() {
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Tax Breakdown</TabsTrigger>
+              <TabsTrigger value="carry">Carry Awards</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-4">
@@ -1480,6 +1708,7 @@ export function MainPanel() {
             <TabsContent value="scenarios"><ScenarioCompareChart /></TabsContent>
             <TabsContent value="stress"><StressTestChart /></TabsContent>
             <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
+            <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
           </CardContent>
         </Card>
       </Tabs>
@@ -1588,17 +1817,11 @@ import { getInvestableAssets, getTotalNetWorth, calculateSmartSpendingDefaults }
 import { formatCompactCurrency } from "../../lib/formatters";
 import { cn } from "../../lib/utils";
 import { useSimStore } from "../../store/useSimStore";
-import type { LumpyEvent } from "../../types";
+import type { CarryAward } from "../../types";
 import { AnimatedNumber } from "../../components/ui/AnimatedNumber";
 
 function Chip({ children }: { children: React.ReactNode }) {
   return <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-muted)]">{children}</span>;
-}
-
-function confidenceToProbability(confidence: LumpyEvent["confidence"]) {
-  if (confidence === "low") return 0.4;
-  if (confidence === "high") return 0.9;
-  return 0.7;
 }
 
 export function Sidebar({ mobile = false }: { mobile?: boolean }) {
@@ -1606,9 +1829,9 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const errors = useSimStore((state) => state.errors);
   const setInput = useSimStore((state) => state.setInput);
   const setInputs = useSimStore((state) => state.setInputs);
-  const addLumpyEvent = useSimStore((state) => state.addLumpyEvent);
-  const updateLumpyEvent = useSimStore((state) => state.updateLumpyEvent);
-  const removeLumpyEvent = useSimStore((state) => state.removeLumpyEvent);
+  const addCarryAward = useSimStore((state) => state.addCarryAward);
+  const updateCarryAward = useSimStore((state) => state.updateCarryAward);
+  const removeCarryAward = useSimStore((state) => state.removeCarryAward);
   const applySmartSpendingDefaults = useSimStore((state) => state.applySmartSpendingDefaults);
   
   const investable = getInvestableAssets(inputs);
@@ -1842,94 +2065,50 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="events" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
-            <AccordionTrigger>Lumpy Events <Chip>{inputs.lumpyEvents.length}</Chip></AccordionTrigger>
+          <AccordionItem value="carry" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+            <AccordionTrigger>Carry Awards <Chip>{inputs.carryAwards.length}</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2">
-                <p className="text-[11px] font-bold text-[var(--text-primary)] mb-1">What are lumpy events?</p>
+                <p className="text-[11px] font-bold text-[var(--text-primary)] mb-1">Private Equity Carry</p>
                 <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                  One-time cash events like carried interest, real estate sales, or capital calls.
-                  Confidence affects how often this fires across simulations.
+                  Add your carry awards. Distributions follow a 12-year curve starting from the vintage year.
                 </p>
               </div>
 
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">Quick Add</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'Carry', type: 'carry', sub: 'LTCG Taxed' },
-                    { label: 'RE Sale', type: 're', sub: 'LTCG Taxed' },
-                    { label: 'Bonus', type: 'bonus', sub: 'Ordinary Tax' },
-                    { label: 'Cap Call', type: 'call', sub: 'Outflow' },
-                  ].map(btn => (
-                    <button
-                      key={btn.type}
-                      onClick={() => {
-                        const defaults = btn.type === 'carry' ? { label: "Carry Distribution", taxType: "ltcg" as const, amount: 1500000, confidence: "medium" as const, probability: 0.7 }
-                          : btn.type === 're' ? { label: "Real Estate Sale", taxType: "ltcg" as const, amount: 800000, confidence: "medium" as const, probability: 0.8 }
-                          : btn.type === 'bonus' ? { label: "Annual Bonus", taxType: "ordinary" as const, amount: 300000, confidence: "high" as const, probability: 0.9 }
-                          : { label: "Capital Call", taxType: "none" as const, amount: -250000, confidence: "high" as const, probability: 1.0 };
-                        addLumpyEvent({ id: Math.random().toString(36).substr(2, 9), year: inputs.currentAge + 5, ...defaults });
-                      }}
-                      className="flex flex-col items-start rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2.5 text-left hover:border-[var(--accent)] transition-colors"
-                    >
-                      <span className="text-xs font-bold text-[var(--text-primary)]">{btn.label}</span>
-                      <span className="text-[9px] text-[var(--text-muted)] mt-0.5">{btn.sub}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {inputs.carryAwards.length === 0 && <p className="text-center text-xs text-[var(--text-muted)] py-4">No carry awards added.</p>}
 
-              {inputs.lumpyEvents.length === 0 && <p className="text-center text-xs text-[var(--text-muted)] py-4">No events added yet.</p>}
-
-              {inputs.lumpyEvents.map((event) => (
-                <div key={event.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3 grid gap-2">
+              {inputs.carryAwards.map((award) => (
+                <div key={award.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3 grid gap-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={cn("px-2 py-0.5 rounded text-[9px] font-bold border", event.amount >= 0 ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20" : "bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/20")}>
-                        {event.amount >= 0 ? "INFLOW" : "OUTFLOW"}
-                      </span>
-                      <span className={cn("px-2 py-0.5 rounded text-[9px] font-bold border", event.taxType === 'ltcg' ? "bg-teal-400/10 text-teal-400 border-teal-400/20" : event.taxType === 'ordinary' ? "bg-amber-400/10 text-amber-400 border-amber-400/20" : "bg-slate-400/10 text-slate-400 border-slate-400/20")}>
-                        {event.taxType === 'ltcg' ? 'LTCG' : event.taxType === 'ordinary' ? 'ORDINARY' : 'NO TAX'}
-                      </span>
-                    </div>
-                    <button onClick={() => removeLumpyEvent(event.id)} className="text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded p-1 transition-colors"><Trash2 size={14} /></button>
+                    <span className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Award Item</span>
+                    <button onClick={() => removeCarryAward(award.id)} className="text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded p-1 transition-colors"><Trash2 size={14} /></button>
                   </div>
-                  <Input value={event.label} onChange={(e) => updateLumpyEvent({ ...event, label: e.target.value })} className="h-8 text-xs" />
-                  <div className="grid grid-cols-2 gap-3">
+                  <Input value={award.label} onChange={(e) => updateCarryAward({ ...award, label: e.target.value })} className="h-8 text-xs" />
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="grid gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Age</label>
-                      <Input type="number" value={event.year} min={inputs.currentAge} max={inputs.planningAge} onChange={(e) => updateLumpyEvent({ ...event, year: Number(e.target.value) })} className="h-8 text-xs" />
+                      <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Vintage</label>
+                      <Input type="number" value={award.vintageYear} onChange={(e) => updateCarryAward({ ...award, vintageYear: Number(e.target.value) })} className="h-8 text-xs" />
                     </div>
                     <div className="grid gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Amount</label>
-                      <div className="relative">
-                        <span className={cn("absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold", event.amount >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]")}>{event.amount >= 0 ? "+$" : "-$"}</span>
-                        <Input type="number" value={Math.abs(event.amount)} onChange={(e) => { const val = Number(e.target.value); const sign = event.amount >= 0 ? 1 : -1; updateLumpyEvent({ ...event, amount: val * sign }); }} className={cn("h-8 pl-7 text-xs font-semibold", event.amount >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]")} />
-                      </div>
+                      <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Total Pool ($)</label>
+                      <Input type="number" value={award.totalPoolValue} onChange={(e) => updateCarryAward({ ...award, totalPoolValue: Number(e.target.value) })} className="h-8 text-xs" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Confidence</label>
-                      <div className="flex gap-1">
-                        {([{ k: 'low', l: '40%' }, { k: 'medium', l: '70%' }, { k: 'high', l: '90%' }] as const).map(c => (
-                          <button key={c.k} onClick={() => updateLumpyEvent({ ...event, confidence: c.k, probability: c.k === 'low' ? 0.4 : c.k === 'high' ? 0.9 : 0.7 })} className={cn("flex-1 rounded py-1 text-[9px] font-bold transition-colors", event.confidence === c.k ? "bg-[var(--accent)] text-white" : "bg-white/10 text-[var(--text-muted)]")}>{c.l}</button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Tax Type</label>
-                      <select value={event.taxType} onChange={(e) => updateLumpyEvent({ ...event, taxType: e.target.value as any })} className="h-8 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] px-2 text-[10px] text-[var(--text-primary)]">
-                        <option value="none">No Tax</option>
-                        <option value="ltcg">LTCG (~24%)</option>
-                        <option value="ordinary">Ordinary (~37%)</option>
-                      </select>
-                    </div>
-                  </div>
+                  <SliderInput 
+                    label="Your Share" 
+                    value={award.poolValueCapture} 
+                    min={0} max={0.05} step={0.001} format="percent"
+                    onChange={(v) => updateCarryAward({ ...award, poolValueCapture: v })} 
+                  />
+                  <SliderInput 
+                    label="Vested" 
+                    value={award.vestedPercent} 
+                    min={0} max={1} step={0.01} format="percent"
+                    onChange={(v) => updateCarryAward({ ...award, vestedPercent: v })} 
+                  />
                 </div>
               ))}
-              <Button onClick={() => addLumpyEvent({ id: Math.random().toString(36).substr(2, 9), label: "Custom Event", year: inputs.currentAge + 5, amount: 0, probability: 1, taxType: "none", confidence: "medium" })} variant="secondary" className="w-full text-xs border-dashed"><Plus size={14} className="mr-2" /> Add Event</Button>
+              <Button onClick={() => addCarryAward({ id: Math.random().toString(36).substr(2, 9), label: "New Carry Award", vintageYear: new Date().getFullYear(), totalPoolValue: 50_000_000, poolValueCapture: 0.005, vestedPercent: 0, gpCommitPercent: 0.01 })} variant="secondary" className="w-full text-xs border-dashed"><Plus size={14} className="mr-2" /> Add Carry Award</Button>
             </AccordionContent>
           </AccordionItem>
 
@@ -2312,9 +2491,9 @@ export const TooltipContent = TooltipPrimitive.Content;
 
 
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\engine\monteCarlo.ts
-import { SSA_MORTALITY_QX } from "../lib/constants";
+import { SSA_MORTALITY_QX, CARRY_DISTRIBUTION_CURVE } from "../lib/constants";
 import { formatCompactCurrency, formatPercentage } from "../lib/formatters";
-import type { CollegeEvent, LumpyEvent, PercentilesAtAge, SimInputs, SimResults, StackedBandDataPoint, StressScenario } from "../types";
+import type { CarryAward, CollegeEvent, PercentilesAtAge, SimInputs, SimResults, StackedBandDataPoint, StressScenario } from "../types";
 import { getSpendingForAge } from "./spendingSmile";
 
 function randomNormal(): number {
@@ -2325,7 +2504,7 @@ function randomNormal(): number {
 
 function logNormalReturn(mu: number, sigma: number): number {
   const z = randomNormal();
-  return Math.exp(mu - 0.5 * sigma ** 2 + sigma * z) - 1;
+  return (1 + mu) * Math.exp(sigma * z) - 1;
 }
 
 function percentile(values: number[], target: number): number {
@@ -2336,31 +2515,82 @@ function percentile(values: number[], target: number): number {
 }
 
 // TODO: Move these to a central tax configuration or user inputs
-const ESTIMATED_ORDINARY_TAX_RATE = 0.40;
-const ESTIMATED_LTCG_TAX_RATE = 0.24;
+// Federal-only rate estimates. State tax added dynamically from inputs.
+const FEDERAL_ORDINARY_TAX_RATE = 0.37;
+const FEDERAL_LTCG_TAX_RATE = 0.20;
+// LTCG add-on for net investment income tax (applies to high earners)
+const NIIT_RATE = 0.038;
 
-function taxableEventAmount(event: LumpyEvent): number {
-  if (event.taxType === "ordinary") return event.amount * (1 - ESTIMATED_ORDINARY_TAX_RATE);
-  if (event.taxType === "ltcg") return event.amount * (1 - ESTIMATED_LTCG_TAX_RATE);
-  return event.amount;
-}
+// Estimated federal marginal rate applied to IRA/401k distributions in
+// retirement. Reflects the 22% bracket where most distributions land
+// when stacked with Social Security. State tax is added separately.
+const ESTIMATED_RETIREMENT_ORDINARY_RATE = 0.22;
 
-function lumpyEventCashFlow(age: number, events: LumpyEvent[]): number {
-  return events.reduce((total, event) => {
-    if (event.year !== age || Math.random() > event.probability) return total;
-    return total + taxableEventAmount(event);
-  }, 0);
+function estimateWithdrawalTax(
+  portfolioDraw: number,
+  deferredFraction: number,
+  taxableFraction: number,
+  inputs: SimInputs
+): number {
+  if (portfolioDraw <= 0) return 0;
+  // Traditional IRA/401k draws: taxed as ordinary income
+  const deferredDraw = portfolioDraw * deferredFraction;
+  const ordinaryTax = deferredDraw * (ESTIMATED_RETIREMENT_ORDINARY_RATE + inputs.stateIncomeTaxRate);
+  // Taxable brokerage draws: taxed at LTCG rate (assumes long-held positions)
+  const taxableDraw = portfolioDraw * taxableFraction;
+  const ltcgTax = taxableDraw * (FEDERAL_LTCG_TAX_RATE + NIIT_RATE);
+  // Roth/tax-free draws: zero tax (implicitly the remainder)
+  return ordinaryTax + ltcgTax;
 }
 
 function collegeCashFlow(age: number, events: CollegeEvent[], inflationRate: number, currentAge: number): number {
   return events.reduce((total, event) => {
     const endAge = event.startYear + event.years;
     if (age < event.startYear || age >= endAge) return total;
-    const yearIndex = age - event.startYear;
     const inflatedCost = event.annualCost * Math.pow(1 + inflationRate, Math.max(0, age - currentAge));
-    const savingsOffset = yearIndex === 0 ? Math.min(event.existingSavings529, inflatedCost) : 0;
-    return total - Math.max(0, inflatedCost - savingsOffset);
+    const annualSavingsOffset = Math.min(event.existingSavings529 / event.years, inflatedCost);
+    return total - Math.max(0, inflatedCost - annualSavingsOffset);
   }, 0);
+}
+
+// Returns net carry distributions (after LTCG tax) and GP commit
+// outflows separately so the withdrawal tax model can use them correctly.
+function carryAwardCashFlows(
+  calendarYear: number,
+  awards: CarryAward[],
+  inputs: SimInputs
+): { netIncome: number; gpCommits: number } {
+  let netIncome = 0;
+  let gpCommits = 0;
+
+  for (const award of awards) {
+    const fundYear = calendarYear - award.vintageYear + 1;
+
+    // GP commit: called straight-line over first 3 fund years
+    if (fundYear >= 1 && fundYear <= 3) {
+      gpCommits += (award.totalPoolValue * award.gpCommitPercent) / 3;
+    }
+
+    // Distribution: apply curve, capture discount, and vesting scalar
+    if (fundYear >= 1 && fundYear <= 12) {
+      const curvePct = CARRY_DISTRIBUTION_CURVE[fundYear - 1] ?? 0;
+      if (curvePct > 0) {
+        const gross =
+          award.totalPoolValue *
+          award.poolValueCapture *
+          award.vestedPercent *
+          curvePct;
+        // Tax at LTCG + NIIT + state rate (carry is long-term capital gain)
+        const taxRate = Math.min(
+          FEDERAL_LTCG_TAX_RATE + NIIT_RATE + inputs.stateIncomeTaxRate,
+          0.55
+        );
+        netIncome += gross * (1 - taxRate);
+      }
+    }
+  }
+
+  return { netIncome, gpCommits };
 }
 
 function salaryIncome(age: number, currentAge: number, retirementAge: number, salary: number, inflationRate: number): number {
@@ -2523,8 +2753,14 @@ function stressReturn(baseReturn: number, inputs: SimInputs, yearIndex: number, 
   if (yearIndex === 1 && stressScenario.yearTwoReturn !== undefined) return { annualReturn: stressScenario.yearTwoReturn, inflationRate: inputs.inflationRate };
   if (yearIndex === 2 && stressScenario.yearThreeReturn !== undefined) return { annualReturn: stressScenario.yearThreeReturn, inflationRate: inputs.inflationRate };
   if (stressScenario.years !== undefined && yearIndex < stressScenario.years) {
+    // Apply overrideReturn as a mean shift on the stochastic baseReturn.
+    // This shifts the average return toward the stress scenario target
+    // while preserving the full Monte Carlo variance across paths.
+    const annualReturn = stressScenario.overrideReturn !== undefined
+      ? baseReturn + (stressScenario.overrideReturn - inputs.expectedReturn)
+      : baseReturn;
     return {
-      annualReturn: stressScenario.overrideReturn ?? baseReturn,
+      annualReturn,
       inflationRate: stressScenario.overrideInflation ?? inputs.inflationRate,
     };
   }
@@ -2536,21 +2772,24 @@ export function computeStackedBands(
   startingAssets: number,
   retirementAge: number,
   planningAge: number,
+  inflationRate: number,
+  currentAge: number,
 ): StackedBandDataPoint[] {
   const firstPath = paths[0];
   if (!firstPath) return [];
-  const currentAge = planningAge - firstPath.length + 1;
 
   return firstPath.map((_, index) => {
     const age = currentAge + index;
     const values = paths.map((path) => path[index] ?? 0);
     
     const total = paths.length;
+    const yearsElapsed = age - currentAge;
+    const realThreshold = startingAssets * Math.pow(1 + inflationRate, yearsElapsed);
     const brokeCount = values.filter(v => v <= 0).length;
-    const strugglingCount = values.filter(v => v > 0 && v <= startingAssets * 0.5).length;
-    const survivingCount = values.filter(v => v > startingAssets * 0.5 && v <= startingAssets).length;
-    const thrivingCount = values.filter(v => v > startingAssets && v <= startingAssets * 2).length;
-    const flourishingCount = values.filter(v => v > startingAssets * 2).length;
+    const strugglingCount = values.filter(v => v > 0 && v <= realThreshold * 0.5).length;
+    const survivingCount = values.filter(v => v > realThreshold * 0.5 && v <= realThreshold).length;
+    const thrivingCount = values.filter(v => v > realThreshold && v <= realThreshold * 2).length;
+    const flourishingCount = values.filter(v => v > realThreshold * 2).length;
 
     const dead = age >= retirementAge ? getCumulativeMortality(retirementAge, age) : 0;
     const livingPct = Math.max(0, 100 - dead);
@@ -2586,6 +2825,12 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
   let ruinedPaths = 0;
   const startingAssets = getInvestableAssets(inputs);
 
+  // Constant proxies for the deferred/taxable asset mix.
+  // Used to estimate the tax character of portfolio withdrawals in retirement.
+  const totalInvestableForTax = Math.max(1, startingAssets);
+  const deferredFraction = inputs.taxDeferredAssets / totalInvestableForTax;
+  const taxableFraction = inputs.taxableAssets / totalInvestableForTax;
+
   for (let simulationIndex = 0; simulationIndex < inputs.numSimulations; simulationIndex += 1) {
     let wealth = Math.max(0, startingAssets);
     let ruined = false;
@@ -2594,6 +2839,7 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
 
     for (let yearIndex = 0; yearIndex < horizon; yearIndex += 1) {
       const age = inputs.currentAge + yearIndex;
+      const calendarYear = inputs.simulationStartYear + yearIndex;
       const baseReturn = logNormalReturn(inputs.expectedReturn, inputs.volatility);
       const stressed = stressReturn(baseReturn, inputs, yearIndex, stressScenario);
       const spending = getSpendingForAge(age, inputs.retirementAge, { ...inputs, inflationRate: stressed.inflationRate });
@@ -2606,10 +2852,16 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
         // Calculate Gross Incomes
         let annualGrossIncome = salaryIncome(age, inputs.currentAge, inputs.retirementAge, inputs.annualSalary, inputs.inflationRate);
         annualGrossIncome += inputs.hasSpouse
-          ? salaryIncome(age, inputs.spouseCurrentAge, inputs.spouseRetirementAge, inputs.spouseAnnualSalary, inputs.inflationRate)
+          ? salaryIncome(
+              age - (inputs.currentAge - inputs.spouseCurrentAge),
+              inputs.spouseCurrentAge,
+              inputs.spouseRetirementAge,
+              inputs.spouseAnnualSalary,
+              inputs.inflationRate
+            )
           : 0;
         annualGrossIncome += socialSecurityIncome(age, inputs);
-        annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, yearIndex) : 0;
+        annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge) : 0;
         
         const isRetired = age >= inputs.retirementAge;
         const taxResult = calculateTaxes(annualGrossIncome, inputs, isRetired);
@@ -2620,18 +2872,34 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
           wealth += taxResult.afterTaxIncome;
         } else {
           // During accumulation:
-          // 1. Pre-tax savings go directly to wealth pool
+          // 1. Pre-tax savings go directly to wealth pool (tax-deferred)
           const preTaxContributions = annualGrossIncome * inputs.preTaxSavingsRate;
-          // 2. After-tax savings from take-home pay
-          const afterTaxSaved = taxResult.afterTaxIncome * inputs.afterTaxSavingsRate;
+          // 2. True take-home: gross minus pre-tax contributions minus all taxes
+          const trueAfterTaxTakeHome = Math.max(0, taxResult.afterTaxIncome - preTaxContributions);
+          // 3. After-tax savings from actual take-home
+          const afterTaxSaved = trueAfterTaxTakeHome * inputs.afterTaxSavingsRate;
           wealth += preTaxContributions + afterTaxSaved;
         }
-        
-        wealth += lumpyEventCashFlow(age, inputs.lumpyEvents);
+
+        const { netIncome: carryNetIncome, gpCommits: carryGPCommits } =
+          carryAwardCashFlows(calendarYear, inputs.carryAwards, inputs);
+        wealth += carryNetIncome;
+        wealth -= carryGPCommits;
         wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);
-        wealth -= age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
-        wealth -= yearIndex < inputs.mortgageYearsRemaining ? inputs.mortgageAnnualPayment : 0;
+        if (wealth > 0) {
+          wealth -= age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
+          wealth -= yearIndex < inputs.mortgageYearsRemaining ? inputs.mortgageAnnualPayment : 0;
+        }
         wealth -= spending;
+        // In retirement: apply tax on the net portfolio draw.
+        // Subtract carry income from the draw since it is already net of LTCG tax.
+        if (isRetired) {
+          const portfolioDraw = Math.max(
+            0,
+            spending - taxResult.afterTaxIncome - carryNetIncome
+          );
+          wealth -= estimateWithdrawalTax(portfolioDraw, deferredFraction, taxableFraction, inputs);
+        }
         wealth = Math.max(0, wealth);
       }
 
@@ -2663,7 +2931,7 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
   return {
     paths,
     percentilePaths,
-    stackedBands: computeStackedBands(paths, startingAssets, inputs.retirementAge, inputs.planningAge),
+    stackedBands: computeStackedBands(paths, startingAssets, inputs.retirementAge, inputs.planningAge, inputs.inflationRate, inputs.currentAge),
     ruinProbability,
     medianTerminalWealth: percentile(terminalWealth, 50),
     successRate,
@@ -2715,10 +2983,23 @@ export function getAccumulationSummary(inputs: SimInputs): {
 export function solveSustainableSpend(inputs: SimInputs, targetSuccessRate = 0.85): number {
   let low = 25_000;
   let high = 750_000;
+  const trialsPerPoint = 2;
+  const simCount = Math.min(inputs.numSimulations, 400);
   for (let i = 0; i < 10; i += 1) {
     const mid = (low + high) / 2;
-    const result = runSimulation({ ...inputs, spendingGoGo: mid, spendingSlowGo: mid * 0.75, spendingNoGo: mid * 0.6, numSimulations: Math.min(inputs.numSimulations, 500) });
-    if (result.successRate >= targetSuccessRate) low = mid;
+    const baseParams = {
+      ...inputs,
+      spendingGoGo: mid,
+      spendingSlowGo: mid * 0.75,
+      spendingNoGo: mid * 0.6,
+      numSimulations: simCount,
+    };
+    let totalSuccess = 0;
+    for (let t = 0; t < trialsPerPoint; t++) {
+      totalSuccess += runSimulation(baseParams).successRate;
+    }
+    const avgSuccessRate = totalSuccess / trialsPerPoint;
+    if (avgSuccessRate >= targetSuccessRate) low = mid;
     else high = mid;
   }
   return low / 12;
@@ -2839,6 +3120,23 @@ export function estimateEventTax(event: LumpyEvent): number {
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\lib\constants.ts
 import type { SimInputs } from "../types";
 
+// Distribution curve as % of total pool value by fund year (index 0 = Year 1).
+// Represents the expected timing of carry distributions over a 12-year fund life.
+export const CARRY_DISTRIBUTION_CURVE: number[] = [
+  0,      // Year 1
+  0,      // Year 2
+  0.05,   // Year 3
+  0.075,  // Year 4
+  0.10,   // Year 5
+  0.125,  // Year 6
+  0.15,   // Year 7
+  0.15,   // Year 8
+  0.15,   // Year 9
+  0.125,  // Year 10
+  0.05,   // Year 11
+  0.025,  // Year 12
+];
+
 export const DEFAULT_INPUTS: SimInputs = {
   currentAge: 47,
   retirementAge: 55,
@@ -2869,27 +3167,8 @@ export const DEFAULT_INPUTS: SimInputs = {
   volatility: 0.15,
   inflationRate: 0.028,
   numSimulations: 1000,
-  lumpyEvents: [
-    {
-      id: "carry-1",
-      label: "Carry distribution",
-      year: 52,
-      amount: 1_500_000,
-      probability: 0.7,
-      taxType: "ltcg",
-      confidence: "medium",
-    },
-    {
-      id: "capital-call-1",
-      label: "Capital Call",
-      year: 48,
-      amount: -250000,
-      probability: 1,
-      taxType: "none",
-      confidence: "high",
-    },
-  ],
-  numKids: 2,
+  carryAwards: [],
+  simulationStartYear: new Date().getFullYear(),
   collegeEvents: [
     {
       id: "college-1",
@@ -3045,7 +3324,7 @@ export function cn(...inputs: ClassValue[]) {
 import { create } from "zustand";
 import { runSimulation, calculateSmartSpendingDefaults } from "../engine/monteCarlo";
 import { DEFAULT_INPUTS } from "../lib/constants";
-import type { InputErrors, LumpyEvent, Scenario, SimInputs, SimResults } from "../types";
+import type { CarryAward, InputErrors, Scenario, SimInputs, SimResults } from "../types";
 
 interface SimStore {
   inputs: SimInputs;
@@ -3057,14 +3336,14 @@ interface SimStore {
   setInputs: (inputs: Partial<SimInputs>) => void;
   runSimulation: () => void;
   addScenario: (scenario: Scenario) => void;
-  addLumpyEvent: (event: LumpyEvent) => void;
-  updateLumpyEvent: (event: LumpyEvent) => void;
-  removeLumpyEvent: (id: string) => void;
+  addCarryAward: (award: CarryAward) => void;
+  updateCarryAward: (award: CarryAward) => void;
+  removeCarryAward: (id: string) => void;
   resetInputs: () => void;
   applySmartSpendingDefaults: () => void;
 }
 
-const STORAGE_KEY = 'terminus-inputs-v1';
+const STORAGE_KEY = 'terminus-inputs-v2';
 
 function loadSavedInputs(): SimInputs {
   try {
@@ -3162,25 +3441,27 @@ export const useSimStore = create<SimStore>((set, get) => {
       set({ results: runSimulation(currentInputs), isRunning: false });
     },
     addScenario: (scenario) => set((state) => ({ scenarios: [...state.scenarios, scenario] })),
-    addLumpyEvent: (event) => {
-      set((state) => ({ inputs: { ...state.inputs, lumpyEvents: [...state.inputs.lumpyEvents, event] } }));
+    addCarryAward: (award) => {
+      set((state) => ({
+        inputs: { ...state.inputs, carryAwards: [...state.inputs.carryAwards, award] },
+      }));
       scheduleRun(get, set);
     },
-    updateLumpyEvent: (event) => {
+    updateCarryAward: (award) => {
       set((state) => ({
         inputs: {
           ...state.inputs,
-          lumpyEvents: state.inputs.lumpyEvents.map((item) => (item.id === event.id ? event : item)),
+          carryAwards: state.inputs.carryAwards.map((a) => (a.id === award.id ? award : a)),
         },
       }));
       scheduleRun(get, set);
     },
-    removeLumpyEvent: (id) => {
-      set((state) => ({ 
-        inputs: { 
-          ...state.inputs, 
-          lumpyEvents: state.inputs.lumpyEvents.filter((event) => event.id !== id) 
-        } 
+    removeCarryAward: (id) => {
+      set((state) => ({
+        inputs: {
+          ...state.inputs,
+          carryAwards: state.inputs.carryAwards.filter((a) => a.id !== id),
+        },
       }));
       scheduleRun(get, set);
     },
@@ -3238,8 +3519,8 @@ export interface SimInputs {
   volatility: number;
   inflationRate: number;
   numSimulations: number;
-  lumpyEvents: LumpyEvent[];
-  numKids: number;
+  carryAwards: CarryAward[];
+  simulationStartYear: number;
   collegeEvents: CollegeEvent[];
   mortgageBalance: number;
   mortgageAnnualPayment: number;
@@ -3260,6 +3541,16 @@ export interface LumpyEvent {
   probability: number;
   taxType: "ordinary" | "ltcg" | "none";
   confidence: "low" | "medium" | "high";
+}
+
+export interface CarryAward {
+  id: string;
+  label: string;
+  vintageYear: number;
+  totalPoolValue: number;
+  poolValueCapture: number;
+  vestedPercent: number;
+  gpCommitPercent: number;
 }
 
 export interface CollegeEvent {

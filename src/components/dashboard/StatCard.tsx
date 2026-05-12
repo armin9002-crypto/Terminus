@@ -23,19 +23,19 @@ const toneClass = {
 export function StatCard({ icon: Icon, label, value, description, tone = "neutral", sparklineData, sparklineColor }: StatCardProps) {
   return (
     <Card className="shadow-none">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
+      <CardContent className="p-3">
+        <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mutedText">{label}</p>
-            <p className={cn("mt-3 text-3xl font-bold transition-colors duration-300", toneClass[tone])}>{value}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mutedText">{label}</p>
+            <p className={cn("mt-2 text-2xl font-bold transition-colors duration-300", toneClass[tone])}>{value}</p>
           </div>
-          <div className="rounded-md border border-border bg-white/[0.04] p-2 text-teal-200">
-            <Icon size={18} />
+          <div className="rounded-md border border-border bg-white/[0.04] p-1.5 text-teal-200">
+            <Icon size={16} />
           </div>
         </div>
-        <p className="mt-3 text-sm leading-5 text-mutedText">{description}</p>
+        <p className="mt-2 text-xs leading-4 text-mutedText">{description}</p>
         {sparklineData && sparklineData.length > 0 && (
-          <div className="mt-3 h-10 w-full">
+          <div className="mt-2 h-8 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={sparklineData.map((v, i) => ({ i, v }))}>
                 <Line 

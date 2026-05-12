@@ -14,7 +14,7 @@ export function AccordionTrigger({
     <AccordionPrimitive.Header>
       <AccordionPrimitive.Trigger
         className={cn(
-          "flex w-full items-center justify-between gap-3 py-2 text-left text-sm font-semibold text-primaryText",
+          "flex w-full items-center justify-between gap-3 py-1.5 text-left text-sm font-semibold text-primaryText",
           className,
         )}
         {...props}
@@ -29,7 +29,7 @@ export function AccordionTrigger({
 export function AccordionContent({ className, ...props }: AccordionPrimitive.AccordionContentProps) {
   return (
     <AccordionPrimitive.Content
-      className={cn("overflow-hidden pb-4 text-sm text-mutedText", className)}
+      className={cn("overflow-hidden pb-2 text-sm text-mutedText", className)}
       {...props}
     />
   );
