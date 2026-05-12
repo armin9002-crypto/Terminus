@@ -14,21 +14,21 @@ function computeBracketBreakdown(
   isMFJ: boolean
 ): TaxBracket[] {
   const brackets = isMFJ ? [
-    { rate: '10%', min: 0,      max: 23200,  tax: 0 },
-    { rate: '12%', min: 23200,  max: 94300,  tax: 2320 },
-    { rate: '22%', min: 94300,  max: 201050, tax: 10838 },
-    { rate: '24%', min: 201050, max: 383900, tax: 34337 },
-    { rate: '32%', min: 383900, max: 487450, tax: 78221 },
-    { rate: '35%', min: 487450, max: 731200, tax: 111357 },
-    { rate: '37%', min: 731200, max: Infinity, tax: 196669 },
+    { rate: '10%', min: 0,       max: 23850,  tax: 0 },
+    { rate: '12%', min: 23850,   max: 96950,  tax: 2385 },
+    { rate: '22%', min: 96950,   max: 206700, tax: 11157 },
+    { rate: '24%', min: 206700,  max: 394600, tax: 35302 },
+    { rate: '32%', min: 394600,  max: 501050, tax: 80398 },
+    { rate: '35%', min: 501050,  max: 751600, tax: 114462 },
+    { rate: '37%', min: 751600,  max: Infinity, tax: 202155 },
   ] : [
-    { rate: '10%', min: 0,      max: 11600,  tax: 0 },
-    { rate: '12%', min: 11600,  max: 47150,  tax: 1160 },
-    { rate: '22%', min: 47150,  max: 100525, tax: 5426 },
-    { rate: '24%', min: 100525, max: 191950, tax: 17168 },
-    { rate: '32%', min: 191950, max: 243725, tax: 39110 },
-    { rate: '35%', min: 243725, max: 609350, tax: 55678 },
-    { rate: '37%', min: 609350, max: Infinity, tax: 183647 },
+    { rate: '10%', min: 0,       max: 11925,  tax: 0 },
+    { rate: '12%', min: 11925,   max: 48475,  tax: 1193 },
+    { rate: '22%', min: 48475,   max: 103350, tax: 5579 },
+    { rate: '24%', min: 103350,  max: 197300, tax: 17651 },
+    { rate: '32%', min: 197300,  max: 250525, tax: 40199 },
+    { rate: '35%', min: 250525,  max: 626350, tax: 57231 },
+    { rate: '37%', min: 626350,  max: Infinity, tax: 188770 },
   ];
 
   return brackets.map(bracket => {
@@ -69,7 +69,7 @@ export function TaxBreakdownPanel() {
   
   // Pre-tax deductions
   const preTaxDeductions = combinedGross * inputs.preTaxSavingsRate;
-  const stdDeduction = isMFJ ? 29200 : 14600;
+  const stdDeduction = isMFJ ? 30000 : 15000;
   const taxableIncome = Math.max(0, combinedGross - preTaxDeductions);
   const agi = Math.max(0, taxableIncome - stdDeduction);
   
@@ -101,9 +101,9 @@ export function TaxBreakdownPanel() {
   
   const totalTax = fedTaxAfterCredit + totalFICA + stateTax;
   const effectiveRate = combinedGross > 0 ? totalTax / combinedGross : 0;
-  const marginalRate = agi > 731200 ? 0.37 : agi > 487450 ? 0.35 :
-    agi > 383900 ? 0.32 : agi > 201050 ? 0.24 : agi > 94300 ? 0.22 :
-    agi > 23200 ? 0.12 : 0.10;
+  const marginalRate = agi > 751600 ? 0.37 : agi > 501050 ? 0.35 :
+    agi > 394600 ? 0.32 : agi > 206700 ? 0.24 : agi > 96950 ? 0.22 :
+    agi > 23850 ? 0.12 : 0.10;
   const afterTax = Math.max(0, combinedGross - totalTax);
   const saved = preTaxDeductions + afterTax * inputs.afterTaxSavingsRate;
   const spendable = afterTax * (1 - inputs.afterTaxSavingsRate);
@@ -318,7 +318,7 @@ export function TaxBreakdownPanel() {
       </div>
 
       <p className="text-[10px] text-[var(--text-muted)] text-center">
-        Estimates based on 2024 federal brackets. Does not include 
+        Estimates based on 2025 federal brackets. Does not include 
         AMT, state-specific deductions, capital gains, or investment 
         income. Consult a tax advisor for personalized guidance.
       </p>

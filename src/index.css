@@ -117,3 +117,21 @@ input[type="number"] {
   scrollbar-width: thin; 
   scrollbar-color: var(--scrollbar-thumb) transparent; 
 }
+
+:root[data-theme="light"] .recharts-cartesian-grid line {
+  stroke: #cbd5e1;
+}
+:root[data-theme="light"] .recharts-text {
+  fill: #475569;
+}
+:root[data-theme="light"] .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+:root[data-theme="sepia"] .recharts-cartesian-grid line {
+  stroke: #5a4535;
+}
+:root[data-theme="sepia"] .recharts-text {
+  fill: #a08060;
+}

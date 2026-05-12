@@ -333,41 +333,6 @@ export function CarryAwardsChart() {
           </div>
         );
       })}
-
-      {/* Aggregate summary if multiple awards */}
-      {inputs.carryAwards.length > 1 && (() => {
-        const totalNetAll = inputs.carryAwards.reduce((sum, a) => {
-          const gross = a.totalPoolValue * a.poolValueCapture * a.vestedPercent;
-          return sum + gross * (1 - effectiveLtcgRate);
-        }, 0);
-        const totalGPAll = inputs.carryAwards.reduce(
-          (sum, a) => sum + a.totalPoolValue * a.gpCommitPercent,
-          0
-        );
-        return (
-          <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-4">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">
-              All Awards Combined
-            </p>
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div>
-                <p className="text-[var(--success)] font-bold">{formatCompactCurrency(totalNetAll)}</p>
-                <p className="text-[10px] text-[var(--text-muted)]">Total Net Carry</p>
-              </div>
-              <div>
-                <p className="text-[var(--danger)] font-bold">-{formatCompactCurrency(totalGPAll)}</p>
-                <p className="text-[10px] text-[var(--text-muted)]">Total GP Commit</p>
-              </div>
-              <div>
-                <p className={`font-bold ${(totalNetAll - totalGPAll) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-                  {formatCompactCurrency(totalNetAll - totalGPAll)}
-                </p>
-                <p className="text-[10px] text-[var(--text-muted)]">Net Cash All Awards</p>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

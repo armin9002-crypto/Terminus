@@ -45,6 +45,74 @@ function computeAwardTimeline(award: CarryAward, stateIncomeTaxRate: number): Aw
   });
 }
 
+interface AggregateYear {
+  calYear: number;
+  netDistribution: number;
+  gpCommit: number;
+  cumulativeNet: number;
+}
+
+function computeAggregateTimeline(
+  awards: CarryAward[],
+  stateIncomeTaxRate: number
+): AggregateYear[] {
+  if (awards.length === 0) return [];
+  const taxRate = Math.min(FEDERAL_LTCG + NIIT + stateIncomeTaxRate, 0.55);
+  const minYear = Math.min(...awards.map((a) => a.vintageYear));
+  const maxYear = Math.max(...awards.map((a) => a.vintageYear + 11));
+  let cumulative = 0;
+  const result: AggregateYear[] = [];
+  for (let year = minYear; year <= maxYear; year++) {
+    let netDist = 0;
+    let gpCommit = 0;
+    for (const award of awards) {
+      const fundYear = year - award.vintageYear + 1;
+      if (fundYear >= 1 && fundYear <= 3) {
+        gpCommit -= (award.totalPoolValue * award.gpCommitPercent) / 3;
+      }
+      if (fundYear >= 1 && fundYear <= 12) {
+        const curvePct = CARRY_DISTRIBUTION_CURVE[fundYear - 1] ?? 0;
+        const gross =
+          award.totalPoolValue *
+          award.poolValueCapture *
+          award.vestedPercent *
+          curvePct;
+        netDist += gross * (1 - taxRate);
+      }
+    }
+    cumulative += netDist + gpCommit;
+    result.push({ calYear: year, netDistribution: netDist, gpCommit, cumulativeNet: cumulative });
+  }
+  return result;
+}
+
+interface CustomTickProps {
+  x?: number;
+  y?: number;
+  payload?: { value: number };
+  chartData: AwardYear[];
+}
+
+function AwardXTick({ x = 0, y = 0, payload, chartData }: CustomTickProps) {
+  const point = payload ? chartData.find((d) => d.calYear === payload.value) : undefined;
+  const curvePct = point
+    ? (CARRY_DISTRIBUTION_CURVE[point.fundYear - 1] ?? 0) * 100
+    : 0;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={12} textAnchor="middle" fill="#94a3b8" fontSize={10}>
+        {payload?.value}
+      </text>
+      <text x={0} y={0} dy={24} textAnchor="middle" fill="#64748b" fontSize={9}>
+        {point ? `FY${point.fundYear}` : ""}
+      </text>
+      <text x={0} y={0} dy={35} textAnchor="middle" fill="#4b8b7a" fontSize={9}>
+        {point && curvePct > 0 ? `${curvePct.toFixed(1)}%` : ""}
+      </text>
+    </g>
+  );
+}
+
 export function CarryAwardsChart() {
   const inputs = useSimStore((state) => state.inputs);
 
@@ -61,14 +129,95 @@ export function CarryAwardsChart() {
   }
 
   const effectiveLtcgRate = Math.min(FEDERAL_LTCG + NIIT + inputs.stateIncomeTaxRate, 0.55);
+  const aggregateData = computeAggregateTimeline(inputs.carryAwards, inputs.stateIncomeTaxRate);
+
+  const totalNetAll = inputs.carryAwards.reduce((sum, a) => {
+    const gross = a.totalPoolValue * a.poolValueCapture * a.vestedPercent;
+    return sum + gross * (1 - effectiveLtcgRate);
+  }, 0);
+  const totalGPAll = inputs.carryAwards.reduce(
+    (sum, a) => sum + a.totalPoolValue * a.gpCommitPercent,
+    0
+  );
 
   return (
     <div className="grid gap-6">
+
+      {/* -- AGGREGATE SECTION -- */}
+      <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-card)] p-4 grid gap-4">
+        <div>
+          <p className="text-sm font-bold text-[var(--text-primary)]">All Carry Awards -- Combined</p>
+          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+            {inputs.carryAwards.length} award{inputs.carryAwards.length !== 1 ? "s" : ""} |{" "}
+            {formatPercentage(effectiveLtcgRate, 1)} effective LTCG rate
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Total Net Carry", value: formatCompactCurrency(totalNetAll), color: "text-[var(--success)]" },
+            { label: "Total GP Commit", value: `-${formatCompactCurrency(totalGPAll)}`, color: "text-[var(--danger)]" },
+            {
+              label: "Net Cash",
+              value: formatCompactCurrency(totalNetAll - totalGPAll),
+              color: (totalNetAll - totalGPAll) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]",
+            },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] p-2 text-center">
+              <p className={`text-sm font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
+              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-widest">
+                {stat.label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="h-[220px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={aggregateData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+              <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
+              <XAxis
+                dataKey="calYear"
+                tick={{ fill: "#94a3b8", fontSize: 10 }}
+                tickLine={false}
+                axisLine={{ stroke: "#2d3748" }}
+              />
+              <YAxis
+                tickFormatter={formatCompactCurrency}
+                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                width={72}
+              />
+              <Tooltip
+                contentStyle={{ background: "var(--bg-card)", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
+                formatter={(value, name) => [formatCompactCurrency(Number(value)), name]}
+                labelFormatter={(year) => `${year}`}
+              />
+              <ReferenceLine y={0} stroke="#64748b" strokeOpacity={0.5} />
+              <Bar dataKey="gpCommit" name="GP Commit (outflow)" fill="#dc2626" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="netDistribution" name="Net Distribution" fill="#16a34a" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
+              <Line dataKey="cumulativeNet" name="Cumulative Net" stroke="#14b8a6" strokeWidth={2} dot={false} type="monotone" />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* -- DIVIDER -- */}
+      {inputs.carryAwards.length > 0 && (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-[var(--border)]" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+            Individual Awards
+          </span>
+          <div className="flex-1 h-px bg-[var(--border)]" />
+        </div>
+      )}
+
+      {/* -- INDIVIDUAL AWARD CARDS -- */}
       {inputs.carryAwards.map((award) => {
         const data = computeAwardTimeline(award, inputs.stateIncomeTaxRate);
-
-        const totalGross =
-          award.totalPoolValue * award.poolValueCapture * award.vestedPercent;
+        const totalGross = award.totalPoolValue * award.poolValueCapture * award.vestedPercent;
         const totalNet = totalGross * (1 - effectiveLtcgRate);
         const totalGPCommit = award.totalPoolValue * award.gpCommitPercent;
         const netCash = totalNet - totalGPCommit;
@@ -76,19 +225,16 @@ export function CarryAwardsChart() {
         const peakYears = `${award.vintageYear + 6}-${award.vintageYear + 8}`;
 
         return (
-          <div
-            key={award.id}
-            className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4 grid gap-4"
-          >
-            {/* Header */}
+          <div key={award.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4 grid gap-4">
             <div>
               <p className="text-sm font-bold text-[var(--text-primary)]">{award.label}</p>
               <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                Vintage {award.vintageYear} | {formatPercentage(award.vestedPercent, 0)} vested | {formatPercentage(award.poolValueCapture, 0)} capture | {formatPercentage(effectiveLtcgRate, 1)} effective LTCG rate
+                Vintage {award.vintageYear} | {formatPercentage(award.vestedPercent, 0)} vested |{" "}
+                {formatPercentage(award.poolValueCapture, 0)} capture |{" "}
+                {formatPercentage(effectiveLtcgRate, 1)} LTCG rate
               </p>
             </div>
 
-            {/* Summary stats */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
                 { label: "Effective Pool", value: formatCompactCurrency(totalGross), color: "" },
@@ -122,16 +268,17 @@ export function CarryAwardsChart() {
               ))}
             </div>
 
-            {/* Distribution timeline chart */}
-            <div className="h-[220px]">
+            <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 20, left: 8 }}>
                   <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
                   <XAxis
                     dataKey="calYear"
-                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    height={50}
+                    tick={(props) => <AwardXTick {...props} chartData={data} />}
                     tickLine={false}
                     axisLine={{ stroke: "#2d3748" }}
+                    interval={0}
                   />
                   <YAxis
                     tickFormatter={formatCompactCurrency}
@@ -148,7 +295,10 @@ export function CarryAwardsChart() {
                       color: "#f1f5f9",
                     }}
                     formatter={(value, name) => [formatCompactCurrency(Number(value)), name]}
-                    labelFormatter={(year) => `${year} (Fund Year ${data.find((d) => d.calYear === Number(year))?.fundYear ?? ""})`}
+                    labelFormatter={(year) => {
+                      const point = data.find((d) => d.calYear === Number(year));
+                      return `${year} (Fund Year ${point?.fundYear ?? ""})`;
+                    }}
                   />
                   <ReferenceLine y={0} stroke="#64748b" strokeOpacity={0.5} />
                   <Bar
@@ -627,6 +777,7 @@ export function StressTestChart() {
 
 
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\charts\WealthFanChart.tsx
+import { useState } from "react";
 import {
   Area,
   CartesianGrid,
@@ -634,7 +785,6 @@ import {
   Legend,
   Line,
   ReferenceLine,
-  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -646,6 +796,7 @@ import { useSimStore } from "../../store/useSimStore";
 import type { PercentilesAtAge } from "../../types";
 
 interface ChartDatum extends PercentilesAtAge {
+  // These are tuples for Recharts Area component to render bands
   p10p90: [number, number];
   p25p75: [number, number];
 }
@@ -664,21 +815,38 @@ export function WealthFanChart() {
   const setInput = useSimStore((state) => state.setInput);
   const isRunning = useSimStore((state) => state.isRunning);
 
+  const [showWide, setShowWide] = useState(false);
+  const [showNarrow, setShowNarrow] = useState(false);
+  const [showReal, setShowReal] = useState(false);
+
   const combinedSalary = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
   const yearsToRetirement = inputs.retirementAge - inputs.currentAge;
 
-  const retirementIndex = results?.percentilePaths
-    .findIndex(p => p.age === inputs.retirementAge) ?? -1;
-  const retirePlusFive = results?.percentilePaths
-    .find(p => p.age === inputs.retirementAge + 5);
-  const retirePoint = results?.percentilePaths
-    .find(p => p.age === inputs.retirementAge);
+  const retirePoint = results?.percentilePaths.find(p => p.age === inputs.retirementAge);
+  const retirePlusFive = results?.percentilePaths.find(p => p.age === inputs.retirementAge + 5);
   
   const sequenceRisk = retirePoint && retirePlusFive && retirePoint.p10 > 0
     ? (retirePlusFive.p10 - retirePoint.p10) / retirePoint.p10
     : 0;
 
+  function toReal(nominalValue: number, age: number): number {
+    if (!showReal) return nominalValue;
+    const years = age - inputs.currentAge;
+    return nominalValue / Math.pow(1 + inputs.inflationRate, years);
+  }
+
   const data = chartData(results?.percentilePaths ?? []);
+
+  const realData = data.map((point) => ({
+    ...point,
+    p10: toReal(point.p10, point.age),
+    p25: toReal(point.p25, point.age),
+    p50: toReal(point.p50, point.age),
+    p75: toReal(point.p75, point.age),
+    p90: toReal(point.p90, point.age),
+    p10p90: [toReal(point.p10p90[0], point.age), toReal(point.p10p90[1], point.age)] as [number, number],
+    p25p75: [toReal(point.p25p75[0], point.age), toReal(point.p25p75[1], point.age)] as [number, number],
+  }));
 
   if (isRunning) {
     return <div className="h-[520px] animate-pulse rounded-lg border border-border bg-slate-700/30" />;
@@ -688,7 +856,7 @@ export function WealthFanChart() {
     <div className="grid gap-4">
       <div className="h-[520px] min-h-[360px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 20, right: 28, left: 10, bottom: 12 }}>
+          <ComposedChart data={realData} margin={{ top: 20, right: 28, left: 10, bottom: 12 }}>
             <CartesianGrid stroke="#2d3748" strokeOpacity={0.55} vertical={false} />
             <XAxis
               dataKey="age"
@@ -743,27 +911,62 @@ export function WealthFanChart() {
               strokeDasharray="5 5"
               label={{ value: "SS Starts", fill: "#38bdf8", position: "insideTopRight" }}
             />
-            <Area
-              type="monotone"
-              dataKey="p10p90"
-              name="10th-90th percentile"
-              stroke="none"
-              fill="#14b8a6"
-              fillOpacity={0.15}
-              activeDot={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="p25p75"
-              name="25th-75th percentile"
-              stroke="none"
-              fill="#14b8a6"
-              fillOpacity={0.25}
-              activeDot={false}
-            />
+            {showWide && (
+              <Area
+                type="monotone"
+                dataKey="p10p90"
+                name="10th-90th percentile"
+                stroke="none"
+                fill="#14b8a6"
+                fillOpacity={0.15}
+                activeDot={false}
+              />
+            )}
+            {showNarrow && (
+              <Area
+                type="monotone"
+                dataKey="p25p75"
+                name="25th-75th percentile"
+                stroke="none"
+                fill="#14b8a6"
+                fillOpacity={0.25}
+                activeDot={false}
+              />
+            )}
             <Line type="monotone" dataKey="p50" name="Median" stroke="#e2fffb" strokeWidth={2} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap items-center gap-4 rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showWide}
+            onChange={(e) => setShowWide(e.target.checked)}
+            className="accent-[var(--accent)] h-3.5 w-3.5"
+          />
+          <span className="text-[11px] text-[var(--text-muted)]">10thâ€“90th percentile band</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showNarrow}
+            onChange={(e) => setShowNarrow(e.target.checked)}
+            className="accent-[var(--accent)] h-3.5 w-3.5"
+          />
+          <span className="text-[11px] text-[var(--text-muted)]">25thâ€“75th percentile band</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showReal}
+            onChange={(e) => setShowReal(e.target.checked)}
+            className="accent-[var(--accent)] h-3.5 w-3.5"
+          />
+          <span className="text-[11px] text-[var(--text-muted)]">
+            Real terms ({(inputs.inflationRate * 100).toFixed(1)}% inflation-adjusted)
+          </span>
+        </label>
       </div>
       <div className="rounded-md border border-border bg-[var(--bg-card)] p-3">
         <div className="mb-2 flex items-center justify-between text-xs">
@@ -780,9 +983,8 @@ export function WealthFanChart() {
       </div>
       <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mt-2">
         Combined pre-retirement income: {formatCompactCurrency(combinedSalary)}/yr 
-        over {yearsToRetirement} years drives significant accumulation 
-        before retirement. The fan chart shows the full distribution 
-        of {inputs.numSimulations.toLocaleString()} simulated outcomes.
+        over {yearsToRetirement} years. Showing {inputs.numSimulations.toLocaleString()} simulated paths
+        {showReal ? ` in real (${(inputs.inflationRate * 100).toFixed(1)}% inflation-adjusted) ${new Date().getFullYear()} dollars` : " in nominal dollars"}.
       </p>
       {sequenceRisk < -0.25 && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm">
@@ -977,7 +1179,7 @@ export function StatCard({ icon: Icon, label, value, description, tone = "neutra
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mutedText">{label}</p>
             <p className={cn("mt-2 text-2xl font-bold transition-colors duration-300", toneClass[tone])}>{value}</p>
           </div>
-          <div className="rounded-md border border-border bg-white/[0.04] p-1.5 text-teal-200">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--bg-secondary)] p-1.5 text-[var(--accent)]">
             <Icon size={16} />
           </div>
         </div>
@@ -1606,11 +1808,425 @@ export function AppShell() {
 
 
 
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\InfoPage.tsx
+import { useSimStore } from "../../store/useSimStore";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { CARRY_DISTRIBUTION_CURVE } from "../../lib/constants";
+
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="grid gap-3 scroll-mt-6">
+      <h2 className="text-base font-bold text-[var(--text-primary)] border-b border-[var(--border)] pb-2">
+        {title}
+      </h2>
+      <div className="grid gap-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function Sub({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{title}</p>
+      <div className="pl-3 border-l-2 border-[var(--border)] grid gap-1 text-xs text-[var(--text-secondary)]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Callout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-3 py-2 text-xs text-[var(--text-secondary)]">
+      {children}
+    </div>
+  );
+}
+
+function Formula({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 font-mono text-[11px] text-[var(--accent)]">
+      {children}
+    </div>
+  );
+}
+
+const NAV = [
+  { id: "overview", label: "Overview" },
+  { id: "montecarlo", label: "Monte Carlo Method" },
+  { id: "returns", label: "Return Model" },
+  { id: "assets", label: "Assets" },
+  { id: "taxes", label: "Tax Model" },
+  { id: "socialsecurity", label: "Social Security" },
+  { id: "spending", label: "Spending Model" },
+  { id: "carry", label: "Carry Awards" },
+  { id: "college", label: "College Costs" },
+  { id: "liabilities", label: "Liabilities" },
+  { id: "charts", label: "Reading the Charts" },
+  { id: "metrics", label: "Key Metrics" },
+  { id: "limitations", label: "Known Limitations" },
+];
+
+export function InfoPage() {
+  const inputs = useSimStore((state) => state.inputs);
+
+  return (
+    <div className="grid gap-0 lg:grid-cols-[200px_minmax(0,1fr)]">
+
+      {/* Side nav */}
+      <nav className="hidden lg:block sticky top-0 h-fit pr-4 border-r border-[var(--border)]">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">Contents</p>
+        <ul className="grid gap-1">
+          {NAV.map((item) => (
+            <li key={item.id}>
+              <a
+                href={`#${item.id}`}
+                className="block text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors py-0.5"
+              >
+                {item.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* Content */}
+      <div className="grid gap-8 pl-0 lg:pl-6 max-w-3xl">
+
+        {/* -- OVERVIEW -- */}
+        <Section id="overview" title="What is Terminus?">
+          <p>
+            Terminus is a Monte Carlo retirement simulator built specifically for high-income professionals
+            with complex financial pictures: multiple asset buckets, private equity carry, capital call
+            obligations, tax-deferred and taxable accounts, Social Security, and multi-phase retirement spending.
+          </p>
+          <p>
+            It is inspired by the "Rich, Broke, or Dead" visualization concept popularized by engaging-data.com
+            and extends it with a full tax engine, carry award modeling, spending smile, and real/nominal
+            wealth analysis across thousands of simulated futures.
+          </p>
+          <Callout>
+            Every number updates live as you adjust inputs. The model reruns {inputs.numSimulations.toLocaleString()} full
+            simulations (each spanning your entire planning horizon) within 400ms of any input change.
+          </Callout>
+        </Section>
+
+        {/* -- MONTE CARLO -- */}
+        <Section id="montecarlo" title="Monte Carlo Method">
+          <p>
+            A Monte Carlo simulation runs thousands of independent scenarios, each representing one possible
+            version of your financial future. Rather than asking "what happens if markets return 7% every year,"
+            it asks "across all the ways markets could behave, how often do you succeed?"
+          </p>
+          <Sub title="How each path is generated">
+            <p>For each of the {inputs.numSimulations.toLocaleString()} simulations:</p>
+            <ol className="list-decimal pl-5 grid gap-1">
+              <li>Start with your current investable assets today.</li>
+              <li>For each year from your current age to your planning age:</li>
+              <li className="pl-2">Draw a random market return from a log-normal distribution calibrated to your expected return and volatility inputs.</li>
+              <li className="pl-2">Apply that return to the portfolio.</li>
+              <li className="pl-2">Add income (salary, Social Security, carry, other retirement income) net of taxes.</li>
+              <li className="pl-2">Subtract spending (if retired), mortgage payments, capital call obligations, and college costs.</li>
+              <li className="pl-2">Apply tax on portfolio withdrawals (retirement phase only).</li>
+              <li>Record the portfolio value. If it hits zero in retirement, mark the path as ruined.</li>
+            </ol>
+            <p>After all paths, tally up outcomes to produce percentiles, success rates, and band probabilities.</p>
+          </Sub>
+          <Callout>
+            The ordering matters. Return is applied first, then cash flows. This correctly models
+            sequence-of-returns risk: a bad year early in retirement is more damaging than a bad year late,
+            because it reduces the base that future gains compound on.
+          </Callout>
+        </Section>
+
+        {/* -- RETURN MODEL -- */}
+        <Section id="returns" title="Return Model">
+          <Sub title="Log-normal returns">
+            <p>
+              Annual returns are drawn from a log-normal distribution. This means the log of (1 + return)
+              is normally distributed -- producing the realistic property that returns cannot go below -100%
+              and have a positive skew (large gains are possible but large losses are bounded).
+            </p>
+            <Formula>Return_t = (1 + CAGR) * exp(volatility * Z) - 1, where Z ~ N(0, 1)</Formula>
+            <p>
+              The geometric mean (CAGR) of this distribution is exactly your expected return input.
+              This is what most people intend: if you type 7%, the median compounded outcome over many years
+              grows at exactly 7% per year.
+            </p>
+          </Sub>
+          <Sub title="Expected Return input">
+            <p>
+              Your current expected return is {formatPercentage(inputs.expectedReturn, 1)}. This is the geometric mean annual
+              return -- the CAGR, not the arithmetic mean. The arithmetic mean (simple average) will be somewhat
+              higher due to volatility: approximately {formatPercentage(inputs.expectedReturn + 0.5 * inputs.volatility ** 2, 1)} given
+              your current volatility of {formatPercentage(inputs.volatility, 0)}.
+            </p>
+          </Sub>
+          <Sub title="Volatility input">
+            <p>
+              Volatility ({formatPercentage(inputs.volatility, 0)} currently) represents the annualized standard deviation of log-returns.
+              Higher volatility produces wider outcome distributions -- the fan chart bands spread further.
+              A 100% equity portfolio typically has volatility around 15-18%. A balanced portfolio might be 8-12%.
+            </p>
+          </Sub>
+          <Callout>
+            The model uses independent and identically distributed (IID) returns each year. Real markets
+            exhibit volatility clustering and serial correlation. See Limitations for what this means for
+            tail risk estimates.
+          </Callout>
+        </Section>
+
+        {/* -- ASSETS -- */}
+        <Section id="assets" title="Your Assets">
+          <p>
+            Assets are split into five buckets, each treated differently for liquidity and tax purposes.
+            Only the investable buckets (all except Illiquid) enter the simulation as the starting wealth pool.
+          </p>
+          <Sub title="Taxable Brokerage">
+            <p>
+              Standard brokerage accounts. Gains are assumed to be long-held positions, taxed at LTCG rates
+              (20% federal + 3.8% NIIT + your state rate) when withdrawn in retirement. During accumulation,
+              the after-tax savings rate flows here and into other taxable accounts.
+            </p>
+          </Sub>
+          <Sub title="Traditional 401k / IRA (Tax-Deferred)">
+            <p>
+              Pre-tax contributions reduce taxable income today. Withdrawals in retirement are taxed as
+              ordinary income at an assumed 22% federal rate plus your state rate. Your pre-tax savings rate
+              input directly controls how much flows here each working year.
+            </p>
+          </Sub>
+          <Sub title="Roth 401k / IRA (Tax-Free)">
+            <p>
+              After-tax contributions, tax-free growth, and tax-free withdrawals. The model treats draws
+              from this bucket as zero-tax. The asset mix fraction of tax-deferred vs. taxable vs. tax-free
+              is fixed at today's ratio throughout the simulation.
+            </p>
+          </Sub>
+          <Sub title="Illiquid Assets (incl. Home)">
+            <p>
+              Real estate equity, PE fund interests, and other illiquid holdings. These are excluded from
+              the investable portfolio -- the simulation does not assume you can sell them to fund spending.
+              They appear in net worth calculations but do not provide liquidity.
+            </p>
+          </Sub>
+          <Sub title="Cash Reserves">
+            <p>
+              Liquid cash and money market funds. Included in the investable pool. Earns the same return
+              as the portfolio (a simplification -- in practice, cash earns less, but the difference is small
+              relative to total portfolio size).
+            </p>
+          </Sub>
+          <Callout>
+            The model uses a fixed starting asset mix ratio to determine the tax character of future
+            portfolio withdrawals. It does not model Roth conversion strategies or asset location optimization.
+          </Callout>
+        </Section>
+
+        {/* -- TAXES -- */}
+        <Section id="taxes" title="Tax Model">
+          <p>
+            The tax engine uses 2025 federal brackets and attempts to model the full tax picture in both
+            the accumulation phase (working years) and the distribution phase (retirement).
+          </p>
+          <Sub title="Working years -- income tax">
+            <p>
+              During accumulation, the model computes taxes on your combined household gross income using
+              the 2025 federal brackets (MFJ or Single depending on your filing status), the standard
+              deduction ({inputs.filingStatus === 'mfj' ? '$30,000' : '$15,000'}), child tax credits
+              ($2,000/child, phasing out above {inputs.filingStatus === 'mfj' ? '$400K' : '$200K'} AGI),
+              FICA (SS: 6.2% up to $176,100; Medicare: 1.45% + 0.9% above threshold), and your state
+              income tax rate ({formatPercentage(inputs.stateIncomeTaxRate, 1)}).
+            </p>
+          </Sub>
+          <Sub title="Pre-tax savings (401k etc.)">
+            <p>
+              Your pre-tax savings rate ({formatPercentage(inputs.preTaxSavingsRate, 0)} currently) reduces taxable income
+              before bracket calculation. The actual dollar amount goes directly into the wealth pool as
+              tax-deferred savings. The after-tax savings rate is applied to the true take-home after both
+              pre-tax contributions and taxes are deducted.
+            </p>
+            <Formula>
+              True take-home = Gross - Pre-tax contributions - Taxes(Gross - Pre-tax contributions)
+              After-tax saved = True take-home * after-tax savings rate
+            </Formula>
+          </Sub>
+          <Sub title="Retirement years -- income from SS and other sources">
+            <p>
+              In retirement, income from Social Security, pensions, and other retirement income is taxed
+              through the same bracket engine (without FICA, and without pre-tax deductions). This after-tax
+              income supplements the portfolio and reduces the net draw.
+            </p>
+          </Sub>
+          <Sub title="Retirement years -- portfolio withdrawal tax">
+            <p>
+              When spending exceeds income from SS and other sources, the shortfall is a portfolio draw.
+              That draw is taxed based on the asset mix:
+            </p>
+            <ul className="list-disc pl-5 grid gap-1">
+              <li>Traditional IRA/401k fraction: taxed at 22% federal + {formatPercentage(inputs.stateIncomeTaxRate, 1)} state</li>
+              <li>Taxable brokerage fraction: taxed at 20% + 3.8% NIIT (LTCG treatment)</li>
+              <li>Roth fraction: zero tax</li>
+            </ul>
+          </Sub>
+          <Callout>
+            The retirement withdrawal tax rate is a blended estimate, not an exact calculation. It does not
+            model RMDs, Roth conversions, tax-loss harvesting, or QCD strategies. For high-balance
+            tax-deferred accounts, the actual marginal rate on large distributions could be higher than 22%.
+          </Callout>
+        </Section>
+
+        {/* -- SOCIAL SECURITY -- */}
+        <Section id="socialsecurity" title="Social Security"> 
+          <Sub title="Claiming age factors">
+            <p>
+              The Full Retirement Age (FRA) for those born in 1960 or later is 67. Benefits adjust as follows:
+            </p>
+            <ul className="list-disc pl-5 grid gap-1">
+              <li>Claim at 62: benefit reduced ~30% (6.67%/year for first 3 years before FRA, 5%/year thereafter)</li>
+              <li>Claim at FRA (67): full benefit</li>
+              <li>Delay to 70: benefit increased 8% per year past FRA, capping at +24%</li>
+            </ul>
+            <p>Your current claiming age: {inputs.socialSecurityAge}. Claiming factor: approximately {
+              inputs.socialSecurityAge <= 62 ? "70%" :
+              inputs.socialSecurityAge >= 70 ? "124%" :
+              inputs.socialSecurityAge < 67 ?
+                formatPercentage(1 - Math.min(3, 67 - inputs.socialSecurityAge) * 0.0667 - Math.max(0, 67 - inputs.socialSecurityAge - 3) * 0.05, 0) :
+                formatPercentage(1 + (inputs.socialSecurityAge - 67) * 0.08, 0)
+            }</p>
+          </Sub>
+          <Sub title="SS trust fund haircut">
+            <p>
+              The Social Security trust fund is projected to be depleted around 2033-2035, at which point
+              payroll taxes alone would fund approximately 79-83% of scheduled benefits. The model applies
+              a 15% haircut to all SS income as a conservative base case. This is not a prediction â€” it is
+              a planning assumption that can be stress-tested.
+            </p>
+          </Sub>
+          <Sub title="COLA adjustments">
+            <p>
+              SS benefits are inflation-adjusted using your inflation rate input ({formatPercentage(inputs.inflationRate, 1)})
+              from the claiming age forward. In reality, SS uses CPI-W, which may differ from your
+              personal inflation experience.
+            </p>
+          </Sub>
+        </Section>
+
+        {/* -- SPENDING -- */}
+        <Section id="spending" title="Spending Model">
+          <p>
+            The spending smile reflects empirical research showing that retirees typically spend most
+            in early "go-go" retirement when they are healthy and active, taper in middle "slow-go" years,
+            then see costs rise again in late "no-go" years due to healthcare.
+          </p>
+          <Sub title="Three phases">
+            <ul className="list-disc pl-5 grid gap-1">
+              <li>Go-Go ({inputs.goGoYears} years): {formatCompactCurrency(inputs.spendingGoGo)}/yr â€” active travel, lifestyle</li>
+              <li>Slow-Go ({inputs.slowGoYears} years): {formatCompactCurrency(inputs.spendingSlowGo)}/yr â€” reduced activity</li>
+              <li>No-Go (late retirement): {formatCompactCurrency(inputs.spendingNoGo)}/yr base + {formatCompactCurrency(inputs.healthcareSurgeAmount)} healthcare surge</li>
+            </ul>
+          </Sub>
+          <Sub title="Sustainable spend calculation">
+            <p>
+              The "safe sustainable spend" headline is solved via binary search: it finds the go-go
+              spending level where your success rate equals exactly 85%.
+            </p>
+          </Sub>
+        </Section>
+
+        {/* -- CARRY AWARDS -- */}
+        <Section id="carry" title="Carry Awards">
+          <p>
+            Carried interest (carry) is modeled as a structured cash flow following a standard PE fund
+            distribution curve. GP commit outflows are modeled as capital calls in the early years.
+          </p>
+          <Sub title="Distribution curve">
+            <p>Distributions as % of award value by fund year:</p>
+            <div className="grid grid-cols-6 gap-1 mt-1">
+              {CARRY_DISTRIBUTION_CURVE.map((pct, i) => (
+                <div key={i} className="rounded border border-[var(--border)] bg-[var(--bg-primary)] p-1 text-center">
+                  <p className="text-[10px] font-bold text-[var(--accent)]">{pct > 0 ? `${(pct * 100).toFixed(1)}%` : "â€”"}</p>
+                  <p className="text-[9px] text-[var(--text-muted)]">Yr {i + 1}</p>
+                </div>
+              ))}
+            </div>
+          </Sub>
+        </Section>
+
+        {/* -- COLLEGE -- */}
+        <Section id="college" title="College Costs">
+          <Sub title="529 savings offset">
+            <p>
+              Your 529 balance is divided evenly across all college years and applied as an annual offset.
+            </p>
+            <Formula>
+              Annual portfolio draw = max(0, inflated_annual_cost - (529_balance / years))
+            </Formula>
+          </Sub>
+        </Section>
+
+        {/* -- LIABILITIES -- */}
+        <Section id="liabilities" title="Liabilities">
+          <Sub title="Mortgage">
+            <p>
+              Annual mortgage payments are deducted from the portfolio for the number of years remaining
+              specified. Payments are fixed in nominal dollars.
+            </p>
+          </Sub>
+        </Section>
+
+        {/* -- CHARTS -- */}
+        <Section id="charts" title="Reading the Charts">
+          <Sub title="Rich / Broke / Dead">
+            <p>
+              A stacked area chart showing outcome probabilities. The bands represent portfolio value relative to your
+              inflation-adjusted starting assets.
+            </p>
+          </Sub>
+        </Section>
+
+        {/* -- METRICS -- */}
+        <Section id="metrics" title="Key Metrics">
+          <Sub title="Success Rate">
+            <p>
+              The fraction of simulated paths that never depleted the portfolio during retirement.
+            </p>
+          </Sub>
+        </Section>
+
+        {/* -- LIMITATIONS -- */}
+        <Section id="limitations" title="Known Limitations">
+          <Sub title="IID log-normal returns">
+            <p>
+              Real markets exhibit volatility clustering and fat tails. The IID model may understate tail risk.
+            </p>
+          </Sub>
+          <Sub title="Retirement withdrawal tax">
+            <p>
+              Withdrawal taxes are estimated based on your current asset mix and simplified tax rates.
+              RMDs and Roth conversion strategies are not modeled.
+            </p>
+          </Sub>
+          <Callout>
+            Terminus is a planning and exploration tool, not financial advice. Projections are probabilistic.
+            Consult with a qualified financial advisor.
+          </Callout>
+        </Section>
+
+      </div>
+    </div>
+  );
+}
+
+
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\MainPanel.tsx
 import { PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
 import { RichBrokeDeadChart } from "../../components/charts/RichBrokeDeadChart";
 import { CarryAwardsChart } from "../../components/charts/CarryAwardsChart";
 import { ScenarioCompareChart } from "../../components/charts/ScenarioCompareChart";
+import { InfoPage } from "../../components/layout/InfoPage";
 import { SpendingSmileChart } from "../../components/charts/SpendingSmileChart";
 import { StressTestChart } from "../../components/charts/StressTestChart";
 import { WealthFanChart } from "../../components/charts/WealthFanChart";
@@ -1690,6 +2306,7 @@ export function MainPanel() {
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Tax Breakdown</TabsTrigger>
               <TabsTrigger value="carry">Carry Awards</TabsTrigger>
+              <TabsTrigger value="info">How It Works</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-3">
@@ -1700,6 +2317,7 @@ export function MainPanel() {
             <TabsContent value="stress"><StressTestChart /></TabsContent>
             <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
             <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
+            <TabsContent value="info"><InfoPage /></TabsContent>
           </CardContent>
         </Card>
       </Tabs>
@@ -1800,7 +2418,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "..
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { AgeInput } from "../../components/inputs/AgeInput";
 import { CurrencyInput } from "../../components/inputs/CurrencyInput";
 import { SliderInput } from "../../components/inputs/SliderInput";
@@ -1819,7 +2436,6 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const inputs = useSimStore((state) => state.inputs);
   const errors = useSimStore((state) => state.errors);
   const setInput = useSimStore((state) => state.setInput);
-  const setInputs = useSimStore((state) => state.setInputs);
   const addCarryAward = useSimStore((state) => state.addCarryAward);
   const updateCarryAward = useSimStore((state) => state.updateCarryAward);
   const removeCarryAward = useSimStore((state) => state.removeCarryAward);
@@ -2491,7 +3107,7 @@ export const Slider = React.forwardRef<React.ElementRef<typeof SliderPrimitive.R
       className={cn("relative flex h-5 w-full touch-none select-none items-center", className)}
       {...props}
     >
-      <SliderPrimitive.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-slate-700">
+      <SliderPrimitive.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-[var(--border)]">
         <SliderPrimitive.Range className="absolute h-full bg-accent" />
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb className="block size-4 rounded-full border border-accent bg-primaryText shadow-lg shadow-accent/20 focus:outline-none focus:ring-2 focus:ring-accent" />
@@ -3738,19 +4354,19 @@ export function App() {
 
 :root[data-theme="light"] {
   --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
+  --bg-secondary: #f1f5f9;
   --bg-card: #ffffff;
-  --bg-card-hover: #f1f5f9;
-  --border: #e2e8f0;
-  --border-subtle: #f1f5f9;
+  --bg-card-hover: #f8fafc;
+  --border: #cbd5e1;
+  --border-subtle: #e2e8f0;
   --accent: #0d9488;
-  --accent-glow: rgba(13, 148, 136, 0.10);
+  --accent-glow: rgba(13, 148, 136, 0.12);
   --success: #16a34a;
-  --warning: #d97706;
+  --warning: #b45309;
   --danger: #dc2626;
   --text-primary: #0f172a;
   --text-secondary: #334155;
-  --text-muted: #94a3b8;
+  --text-muted: #475569;
   --scrollbar-thumb: #cbd5e1;
   --noise-opacity: 0.02;
 }
@@ -3758,15 +4374,15 @@ export function App() {
 :root[data-theme="sepia"] {
   --bg-primary: #1c1510;
   --bg-secondary: #241d16;
-  --bg-card: #2a211a;
-  --bg-card-hover: #322820;
-  --border: #4a3728;
+  --bg-card: #2e2318;
+  --bg-card-hover: #38291e;
+  --border: #5a4535;
   --border-subtle: #3a2d22;
-  --accent: #d4956a;
-  --accent-glow: rgba(212, 149, 106, 0.15);
-  --success: #7fb069;
-  --warning: #e8a838;
-  --danger: #c94040;
+  --accent: #e8a87c;
+  --accent-glow: rgba(232, 168, 124, 0.15);
+  --success: #8fc972;
+  --warning: #f0b840;
+  --danger: #e05555;
   --text-primary: #f5e6d3;
   --text-secondary: #d4b896;
   --text-muted: #8a7260;

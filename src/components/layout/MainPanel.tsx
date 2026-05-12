@@ -80,7 +80,7 @@ export function MainPanel() {
               <TabsTrigger value="spending">Spending Plan</TabsTrigger>
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
-              <TabsTrigger value="tax">Tax Breakdown</TabsTrigger>
+              <TabsTrigger value="tax">Income Tax</TabsTrigger>
               <TabsTrigger value="carry">Carry Awards</TabsTrigger>
               <TabsTrigger value="info">How It Works</TabsTrigger>
             </TabsList>

@@ -191,31 +191,31 @@ function calculateTaxes(
     : grossIncome * inputs.preTaxSavingsRate;
   const taxableIncome = Math.max(0, grossIncome - preTaxDeductions);
   
-  // 2024 Standard deduction
-  const standardDeduction = isMFJ ? 29200 : 14600;
+  // 2025 Standard deduction
+  const standardDeduction = isMFJ ? 30000 : 15000;
   // Child tax credit (not deduction but reduces tax)
   const childTaxCredit = Math.min(inputs.numDependents, 3) * 2000;
   
   const agi = Math.max(0, taxableIncome - standardDeduction);
   
-  // 2024 Federal brackets MFJ
+  // 2025 Federal brackets
   let federalTax = 0;
   if (isMFJ) {
-    if (agi <= 23200) federalTax = agi * 0.10;
-    else if (agi <= 94300) federalTax = 2320 + (agi - 23200) * 0.12;
-    else if (agi <= 201050) federalTax = 10838 + (agi - 94300) * 0.22;
-    else if (agi <= 383900) federalTax = 34337 + (agi - 201050) * 0.24;
-    else if (agi <= 487450) federalTax = 78221 + (agi - 383900) * 0.32;
-    else if (agi <= 731200) federalTax = 111357 + (agi - 487450) * 0.35;
-    else federalTax = 196669 + (agi - 731200) * 0.37;
+    if (agi <= 23850) federalTax = agi * 0.10;
+    else if (agi <= 96950) federalTax = 2385 + (agi - 23850) * 0.12;
+    else if (agi <= 206700) federalTax = 11157 + (agi - 96950) * 0.22;
+    else if (agi <= 394600) federalTax = 35302 + (agi - 206700) * 0.24;
+    else if (agi <= 501050) federalTax = 80398 + (agi - 394600) * 0.32;
+    else if (agi <= 751600) federalTax = 114462 + (agi - 501050) * 0.35;
+    else federalTax = 202155 + (agi - 751600) * 0.37;
   } else {
-    if (agi <= 11600) federalTax = agi * 0.10;
-    else if (agi <= 47150) federalTax = 1160 + (agi - 11600) * 0.12;
-    else if (agi <= 100525) federalTax = 5426 + (agi - 47150) * 0.22;
-    else if (agi <= 191950) federalTax = 17168 + (agi - 100525) * 0.24;
-    else if (agi <= 243725) federalTax = 39110 + (agi - 191950) * 0.32;
-    else if (agi <= 609350) federalTax = 55678 + (agi - 243725) * 0.35;
-    else federalTax = 183647 + (agi - 609350) * 0.37;
+    if (agi <= 11925) federalTax = agi * 0.10;
+    else if (agi <= 48475) federalTax = 1193 + (agi - 11925) * 0.12;
+    else if (agi <= 103350) federalTax = 5579 + (agi - 48475) * 0.22;
+    else if (agi <= 197300) federalTax = 17651 + (agi - 103350) * 0.24;
+    else if (agi <= 250525) federalTax = 40199 + (agi - 197300) * 0.32;
+    else if (agi <= 626350) federalTax = 57231 + (agi - 250525) * 0.35;
+    else federalTax = 188770 + (agi - 626350) * 0.37;
   }
   
   // Apply child tax credit (phase out above $400K MFJ)
@@ -229,7 +229,7 @@ function calculateTaxes(
   
   // FICA (Social Security 6.2% up to $168,600 + Medicare 1.45%)
   // Additional Medicare 0.9% above $200K (MFJ $250K)
-  const ficaThreshold = 168600;
+  const ficaThreshold = 176100;
   const ficaSS = Math.min(grossIncome, ficaThreshold) * 0.062;
   const ficaMedicare = grossIncome * 0.0145;
   const additionalMedicareThreshold = isMFJ ? 250000 : 200000;

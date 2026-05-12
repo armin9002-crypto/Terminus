@@ -166,7 +166,7 @@ export function WealthFanChart() {
             onChange={(e) => setShowWide(e.target.checked)}
             className="accent-[var(--accent)] h-3.5 w-3.5"
           />
-          <span className="text-[11px] text-[var(--text-muted)]">10th–90th percentile band</span>
+          <span className="text-[11px] text-[var(--text-muted)]">10th-90th percentile band</span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
@@ -175,7 +175,7 @@ export function WealthFanChart() {
             onChange={(e) => setShowNarrow(e.target.checked)}
             className="accent-[var(--accent)] h-3.5 w-3.5"
           />
-          <span className="text-[11px] text-[var(--text-muted)]">25th–75th percentile band</span>
+          <span className="text-[11px] text-[var(--text-muted)]">25th-75th percentile band</span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input

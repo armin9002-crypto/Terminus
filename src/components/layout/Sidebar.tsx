@@ -224,11 +224,11 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                   const combined = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
                   const preTax = combined * inputs.preTaxSavingsRate;
                   const taxable = Math.max(0, combined - preTax);
-                  const stdDed = inputs.filingStatus === 'mfj' ? 29200 : 14600;
+                  const stdDed = inputs.filingStatus === 'mfj' ? 30000 : 15000;
                   const agi = Math.max(0, taxable - stdDed);
                   const approxFedRate = agi > 731200 ? 0.37 : agi > 487450 ? 0.35 : agi > 383900 ? 0.32 : agi > 201050 ? 0.24 : agi > 94300 ? 0.22 : 0.12;
                   const approxFedTax = agi * approxFedRate * 0.72;
-                  const approxFica = Math.min(combined, 168600) * 0.062 + combined * 0.0145;
+                  const approxFica = Math.min(combined, 176100) * 0.062 + combined * 0.0145;
                   const approxState = taxable * inputs.stateIncomeTaxRate;
                   const totalTax = approxFedTax + approxFica + approxState;
                   const afterTax = combined - totalTax;

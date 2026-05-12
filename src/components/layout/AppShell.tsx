@@ -67,7 +67,7 @@ export function AppShell() {
               <span className={cn("size-2 rounded-full bg-emerald-400", isRunning && "animate-pulse")} />
               Live Model
             </div>
-            <span className="rounded-full border border-border bg-white/[0.04] px-3 py-2 text-xs font-semibold text-mutedText">{formatCompactCurrency(numSimulations).replace("$", "")} runs</span>
+            <span className="rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">{formatCompactCurrency(numSimulations).replace("$", "")} runs</span>
             <Button variant="ghost" className="size-9 px-0" aria-label="Share" onClick={() => { setToast(true); window.setTimeout(() => setToast(false), 1800); }}><Share2 size={17} /></Button>
             <Tooltip>
               <TooltipTrigger asChild><Button variant="ghost" className="size-9 px-0" aria-label="Help"><HelpCircle size={17} /></Button></TooltipTrigger>
