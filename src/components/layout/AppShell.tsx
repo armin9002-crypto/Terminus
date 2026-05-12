@@ -2,6 +2,7 @@ import { HelpCircle, Menu, Share2, X } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "../../lib/useTheme";
 import { Theme } from "../../lib/theme";
+import { Theme } from "../../lib/theme";
 import { Button } from "../../components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { formatCompactCurrency } from "../../lib/formatters";
@@ -17,6 +18,19 @@ export function AppShell() {
   const isRunning = useSimStore((state) => state.isRunning);
   const numSimulations = useSimStore((state) => state.inputs.numSimulations);
   const resetInputs = useSimStore(state => state.resetInputs);
+
+  const themeOrder = ['dark', 'light', 'sepia'] as const;
+  const themeLabels: Record<string, string> = {
+    dark: 'Dark',
+    light: 'Light', 
+    sepia: 'Sepia'
+  };
+
+  const cycleTheme = () => {
+    const currentIndex = themeOrder.indexOf(theme);
+    const nextIndex = (currentIndex + 1) % themeOrder.length;
+    setTheme(themeOrder[nextIndex]);
+  };
 
   const themeOrder = ['dark', 'light', 'sepia'] as const;
   const themeLabels: Record<string, string> = {

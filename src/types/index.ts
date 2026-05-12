@@ -29,7 +29,6 @@ export interface SimInputs {
   inflationRate: number;
   numSimulations: number;
   lumpyEvents: LumpyEvent[];
-  numKids: number;
   collegeEvents: CollegeEvent[];
   mortgageBalance: number;
   mortgageAnnualPayment: number;

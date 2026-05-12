@@ -580,7 +580,7 @@ export function WealthFanChart() {
 
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\dashboard\HeroVerdict.tsx
 import { useState, useEffect } from "react";
-import { getInvestableAssets, solveSustainableSpend } from "../../engine/monteCarlo";
+import { getInvestableAssets, solveSustainableSpend, getAccumulationSummary } from "../../engine/monteCarlo";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
 import { cn } from "../../lib/utils";
 import type { SimInputs, SimResults } from "../../types";
@@ -600,6 +600,7 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
   const successRate = results?.successRate;
   const activeTone = tone(successRate ?? 0);
   
+  const summary = getAccumulationSummary(inputs);
   const [sustainableSpend, setSustainableSpend] = useState<number | null>(null);
 
   useEffect(() => {
@@ -630,9 +631,11 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
             Safe sustainable spend at 85% confidence: 
             {sustainableSpend ? `${formatCompactCurrency(sustainableSpend * 12)}/year | ${formatCompactCurrency(sustainableSpend)}/month` : "--"}
           </p>
-          <p className="mt-3 text-sm text-mutedText">
-            Retiring at {inputs.retirementAge} / {formatCompactCurrency(getInvestableAssets(inputs))} investable /{" "}
-            {inputs.numSimulations.toLocaleString()} simulations / Live model
+          <p className="mt-2 text-sm text-mutedText">
+            Retiring at {inputs.retirementAge} | 
+            {formatCompactCurrency(getInvestableAssets(inputs))} today | 
+            Est. {formatCompactCurrency(summary.estimatedRetirementAssets)} at retirement |
+            Saving {formatCompactCurrency(summary.annualSavings)}/yr
           </p>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -777,6 +780,336 @@ export function StatCard({ icon: Icon, label, value, description, tone = "neutra
 
 
 
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\dashboard\TaxBreakdownPanel.tsx
+import { useSimStore } from "../../store/useSimStore";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
+import { getAccumulationSummary } from "../../engine/monteCarlo";
+
+interface TaxBracket {
+  rate: string;
+  income: string;
+  tax: string;
+  filled: number; // 0-100, how much of this bracket is used
+}
+
+function computeBracketBreakdown(
+  agi: number, 
+  isMFJ: boolean
+): TaxBracket[] {
+  const brackets = isMFJ ? [
+    { rate: '10%', min: 0,      max: 23200,  tax: 0 },
+    { rate: '12%', min: 23200,  max: 94300,  tax: 2320 },
+    { rate: '22%', min: 94300,  max: 201050, tax: 10838 },
+    { rate: '24%', min: 201050, max: 383900, tax: 34337 },
+    { rate: '32%', min: 383900, max: 487450, tax: 78221 },
+    { rate: '35%', min: 487450, max: 731200, tax: 111357 },
+    { rate: '37%', min: 731200, max: Infinity, tax: 196669 },
+  ] : [
+    { rate: '10%', min: 0,      max: 11600,  tax: 0 },
+    { rate: '12%', min: 11600,  max: 47150,  tax: 1160 },
+    { rate: '22%', min: 47150,  max: 100525, tax: 5426 },
+    { rate: '24%', min: 100525, max: 191950, tax: 17168 },
+    { rate: '32%', min: 191950, max: 243725, tax: 39110 },
+    { rate: '35%', min: 243725, max: 609350, tax: 55678 },
+    { rate: '37%', min: 609350, max: Infinity, tax: 183647 },
+  ];
+
+  return brackets.map(bracket => {
+    if (agi <= bracket.min) {
+      return { 
+        rate: bracket.rate, 
+        income: '$0', 
+        tax: '$0', 
+        filled: 0 
+      };
+    }
+    const incomeInBracket = Math.max(0, 
+      Math.min(agi, bracket.max === Infinity ? agi : bracket.max) 
+      - bracket.min
+    );
+    const rateNum = parseFloat(bracket.rate) / 100;
+    const taxInBracket = incomeInBracket * rateNum;
+    const bracketSize = bracket.max === Infinity 
+      ? incomeInBracket 
+      : bracket.max - bracket.min;
+    const filled = Math.min(100, (incomeInBracket / bracketSize) * 100);
+    
+    return {
+      rate: bracket.rate,
+      income: formatCompactCurrency(incomeInBracket),
+      tax: formatCompactCurrency(taxInBracket),
+      filled: Math.round(filled),
+    };
+  });
+}
+
+export function TaxBreakdownPanel() {
+  const inputs = useSimStore(state => state.inputs);
+  
+  const isMFJ = inputs.filingStatus === 'mfj';
+  const combinedGross = inputs.annualSalary + 
+    (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
+  
+  // Pre-tax deductions
+  const preTaxDeductions = combinedGross * inputs.preTaxSavingsRate;
+  const stdDeduction = isMFJ ? 29200 : 14600;
+  const taxableIncome = Math.max(0, combinedGross - preTaxDeductions);
+  const agi = Math.max(0, taxableIncome - stdDeduction);
+  
+  // Federal tax calculation
+  const brackets = computeBracketBreakdown(agi, isMFJ);
+  const totalFedTax = brackets.reduce((sum, b) => {
+    const taxNum = parseFloat(b.tax.replace(/[$,KM]/g, '')) * 
+      (b.tax.includes('M') ? 1000000 : b.tax.includes('K') ? 1000 : 1);
+    return sum + taxNum;
+  }, 0);
+  
+  // Child tax credit
+  const childTaxCredit = Math.min(inputs.numDependents, 3) * 2000;
+  const creditPhaseOut = isMFJ 
+    ? Math.max(0, (agi - 400000) / 1000) * 50 
+    : Math.max(0, (agi - 200000) / 1000) * 50;
+  const effectiveChildCredit = Math.max(0, childTaxCredit - creditPhaseOut);
+  const fedTaxAfterCredit = Math.max(0, totalFedTax - effectiveChildCredit);
+  
+  // FICA
+  const ficaSS = Math.min(combinedGross, 168600) * 0.062;
+  const ficaMedicare = combinedGross * 0.0145;
+  const addlMedicareThreshold = isMFJ ? 250000 : 200000;
+  const addlMedicare = Math.max(0, combinedGross - addlMedicareThreshold) * 0.009;
+  const totalFICA = ficaSS + ficaMedicare + addlMedicare;
+  
+  // State tax
+  const stateTax = taxableIncome * inputs.stateIncomeTaxRate;
+  
+  const totalTax = fedTaxAfterCredit + totalFICA + stateTax;
+  const effectiveRate = combinedGross > 0 ? totalTax / combinedGross : 0;
+  const marginalRate = agi > 731200 ? 0.37 : agi > 487450 ? 0.35 :
+    agi > 383900 ? 0.32 : agi > 201050 ? 0.24 : agi > 94300 ? 0.22 :
+    agi > 23200 ? 0.12 : 0.10;
+  const afterTax = Math.max(0, combinedGross - totalTax);
+  const saved = preTaxDeductions + afterTax * inputs.afterTaxSavingsRate;
+  const spendable = afterTax * (1 - inputs.afterTaxSavingsRate);
+
+  // Row component for clarity
+  const Row = ({ 
+    label, value, indent = false, bold = false, 
+    color = 'neutral', border = false 
+  }: { 
+    label: string; value: string; indent?: boolean; 
+    bold?: boolean; color?: string; border?: boolean 
+  }) => (
+    <div className={`flex justify-between items-center py-1 
+      ${border ? 'border-t border-[var(--border)] mt-1 pt-2' : ''}
+      ${indent ? 'pl-4' : ''}
+    `}>
+      <span className={`text-xs ${bold 
+        ? 'font-bold text-[var(--text-primary)]' 
+        : 'text-[var(--text-muted)]'}`}>
+        {label}
+      </span>
+      <span className={`text-xs font-bold tabular-nums ${
+        color === 'danger' ? 'text-[var(--danger)]' :
+        color === 'success' ? 'text-[var(--success)]' :
+        color === 'accent' ? 'text-[var(--accent)]' :
+        'text-[var(--text-primary)]'
+      }`}>
+        {value}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="grid gap-4">
+      
+      {/* Income Summary */}
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          { label: 'Gross Income', value: formatCompactCurrency(combinedGross), color: 'neutral' },
+          { label: 'Total Tax Burden', value: formatCompactCurrency(totalTax), color: 'danger' },
+          { label: 'Effective Tax Rate', value: formatPercentage(effectiveRate, 1), color: 'danger' },
+          { label: 'Annual Take-Home', value: formatCompactCurrency(afterTax), color: 'success' },
+        ].map(stat => (
+          <div key={stat.label} className="rounded-lg border border-[var(--border)] 
+            bg-[var(--bg-card)] p-3 text-center">
+            <p className={`text-xl font-bold tabular-nums ${
+              stat.color === 'danger' ? 'text-[var(--danger)]' :
+              stat.color === 'success' ? 'text-[var(--success)]' :
+              'text-[var(--text-primary)]'
+            }`}>{stat.value}</p>
+            <p className="text-[10px] text-[var(--text-muted)] 
+              uppercase tracking-widest mt-1">
+              {stat.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Two column layout */}
+      <div className="grid gap-4 md:grid-cols-2">
+        
+        {/* Left: Income waterfall */}
+        <div className="rounded-lg border border-[var(--border)] 
+          bg-[var(--bg-card)] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-widest 
+            text-[var(--text-muted)] mb-3">
+            Income Waterfall
+          </p>
+          <Row label="Combined gross income" 
+            value={formatCompactCurrency(combinedGross)} bold />
+          <Row label={`Pre-tax savings (${(inputs.preTaxSavingsRate*100).toFixed(0)}% of gross)`}
+            value={`-${formatCompactCurrency(preTaxDeductions)}`}
+            indent color="danger" />
+          <Row label="Standard deduction" 
+            value={`-${formatCompactCurrency(stdDeduction)}`}
+            indent color="danger" />
+          <Row label="Adjusted gross income (AGI)"
+            value={formatCompactCurrency(agi)} bold border />
+          <Row label="Federal income tax"
+            value={`-${formatCompactCurrency(fedTaxAfterCredit)}`}
+            indent color="danger" />
+          {effectiveChildCredit > 0 && (
+            <Row label={`Child tax credit (${inputs.numDependents} kids)`}
+              value={`+${formatCompactCurrency(effectiveChildCredit)}`}
+              indent color="success" />
+          )}
+          <Row label="FICA (SS + Medicare)"
+            value={`-${formatCompactCurrency(totalFICA)}`}
+            indent color="danger" />
+          <Row label={`State tax (${(inputs.stateIncomeTaxRate*100).toFixed(1)}%)`}
+            value={`-${formatCompactCurrency(stateTax)}`}
+            indent color="danger" />
+          <Row label="After-tax take-home"
+            value={formatCompactCurrency(afterTax)} bold border color="accent" />
+          <Row label={`After-tax savings (${(inputs.afterTaxSavingsRate*100).toFixed(0)}%)`}
+            value={`-${formatCompactCurrency(afterTax * inputs.afterTaxSavingsRate)}`}
+            indent color="danger" />
+          <Row label="Annual spendable income"
+            value={formatCompactCurrency(spendable)} bold border color="success" />
+        </div>
+
+        {/* Right: Federal bracket breakdown */}
+        <div className="rounded-lg border border-[var(--border)] 
+          bg-[var(--bg-card)] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-widest 
+            text-[var(--text-muted)] mb-1">
+            Federal Tax Brackets
+          </p>
+          <p className="text-[10px] text-[var(--text-muted)] mb-3">
+            2024 {isMFJ ? 'Married Filing Jointly' : 'Single'} | 
+            AGI: {formatCompactCurrency(agi)} | 
+            Marginal rate: {(marginalRate * 100).toFixed(0)}%
+          </p>
+          
+          <div className="grid gap-1.5">
+            {brackets.map((bracket) => (
+              <div key={bracket.rate}>
+                <div className="flex justify-between text-[10px] mb-0.5">
+                  <span className="font-bold text-[var(--text-primary)]">
+                    {bracket.rate} bracket
+                  </span>
+                  <span className="text-[var(--text-muted)]">
+                    {bracket.income} income = {bracket.tax} tax
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
+                  <div 
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ 
+                      width: `${bracket.filled}%`,
+                      background: bracket.filled === 0 
+                        ? 'transparent'
+                        : bracket.rate === '10%' ? '#22c55e'
+                        : bracket.rate === '12%' ? '#84cc16'
+                        : bracket.rate === '22%' ? '#eab308'
+                        : bracket.rate === '24%' ? '#f97316'
+                        : bracket.rate === '32%' ? '#ef4444'
+                        : bracket.rate === '35%' ? '#dc2626'
+                        : '#991b1b'
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded border border-[var(--border)] 
+              p-2 text-center">
+              <p className="text-sm font-bold text-[var(--danger)]">
+                {formatPercentage(effectiveRate, 1)}
+              </p>
+              <p className="text-[9px] text-[var(--text-muted)] uppercase">
+                Effective Rate
+              </p>
+            </div>
+            <div className="rounded border border-[var(--border)] 
+              p-2 text-center">
+              <p className="text-sm font-bold text-[var(--warning)]">
+                {(marginalRate * 100).toFixed(0)}%
+              </p>
+              <p className="text-[9px] text-[var(--text-muted)] uppercase">
+                Marginal Rate
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom: Annual savings summary */}
+      <div className="rounded-lg border border-[var(--border)] 
+        bg-[var(--bg-card)] p-4">
+        <p className="text-[11px] font-bold uppercase tracking-widest 
+          text-[var(--text-muted)] mb-3">
+          Annual Savings Breakdown
+        </p>
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="rounded border border-[var(--border)] p-3 text-center">
+            <p className="text-lg font-bold text-[var(--accent)]">
+              {formatCompactCurrency(preTaxDeductions)}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              Pre-Tax (401k/HSA)
+            </p>
+            <p className="text-[9px] text-[var(--text-muted)]">
+              {(inputs.preTaxSavingsRate * 100).toFixed(0)}% of gross
+            </p>
+          </div>
+          <div className="rounded border border-[var(--border)] p-3 text-center">
+            <p className="text-lg font-bold text-[var(--accent)]">
+              {formatCompactCurrency(afterTax * inputs.afterTaxSavingsRate)}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              After-Tax Savings
+            </p>
+            <p className="text-[9px] text-[var(--text-muted)]">
+              {(inputs.afterTaxSavingsRate * 100).toFixed(0)}% of take-home
+            </p>
+          </div>
+          <div className="rounded border border-[var(--border)] p-3 text-center">
+            <p className="text-lg font-bold text-[var(--success)]">
+              {formatCompactCurrency(saved)}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              Total Annual Savings
+            </p>
+            <p className="text-[9px] text-[var(--text-muted)]">
+              {formatPercentage(saved / combinedGross, 0)} of gross
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-[10px] text-[var(--text-muted)] text-center">
+        Estimates based on 2024 federal brackets. Does not include 
+        AMT, state-specific deductions, capital gains, or investment 
+        income. Consult a tax advisor for personalized guidance.
+      </p>
+    </div>
+  );
+}
+
+
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\inputs\AgeInput.tsx
 import { SliderInput } from "./SliderInput";
 
@@ -870,16 +1203,21 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
   };
 
   return (
-    <div className="grid gap-4 py-2">
+    <div className="grid gap-1 py-1">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">
+            {label}
+          </span>
           {impact.visible && (
             <span className={cn(
-              "text-[10px] font-bold transition-opacity duration-500",
-              impact.delta > 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
+              "text-[9px] font-bold",
+              impact.delta > 0 
+                ? "text-[var(--success)]" 
+                : "text-[var(--danger)]"
             )}>
-              {impact.delta > 0 ? "(+)" : "(-)"} {Math.abs(impact.delta * 100).toFixed(1)}%
+              {impact.delta > 0 ? "(+)" : "(-)"} 
+              {Math.abs(impact.delta * 100).toFixed(1)}%
             </span>
           )}
         </div>
@@ -893,22 +1231,19 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
                 : String(value)
           }
           onChange={(e) => {
-            const raw = Number(e.target.value.replace(/[^0-9.-]+/g, ""));
-            if (format === "percent") {
-              onChange(raw / 100);
-            } else if (format === "currency") {
-              onChange(raw);
-            } else {
-              onChange(raw);
-            }
+            const raw = Number(
+              e.target.value.replace(/[^0-9.-]+/g, "")
+            );
+            if (format === "percent") onChange(raw / 100);
+            else onChange(raw);
           }}
           onFocus={(e) => e.target.select()}
-          className="w-24 bg-transparent text-right font-mono text-[15px] font-medium text-[var(--accent)] outline-none focus:shadow-[0_0_0_2px_var(--accent-glow)] rounded px-1"
+          className="w-20 bg-transparent text-right font-mono text-[13px] font-medium text-[var(--accent)] outline-none rounded px-1"
         />
       </div>
 
       <div 
-        className="relative pt-6 pb-2"
+        className="relative"
         onMouseDown={() => setIsDragging(true)}
         onMouseUp={() => setIsDragging(false)}
         onTouchStart={() => setIsDragging(true)}
@@ -916,11 +1251,11 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
       >
         {isDragging && (
           <div 
-            className="absolute -top-2 z-20 -translate-x-1/2 rounded bg-[var(--accent)] px-2 py-1 text-[11px] font-bold text-white shadow-lg transition-opacity duration-150"
+            className="absolute -top-6 z-20 -translate-x-1/2 rounded bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-bold text-white shadow-lg"
             style={{ left: `${percentage}%` }}
           >
             {formattedValue(value)}
-            <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-[var(--accent)]" />
+            <div className="absolute -bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rotate-45 bg-[var(--accent)]" />
           </div>
         )}
         
@@ -930,30 +1265,18 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
           max={max} 
           step={step} 
           onValueChange={([next]) => onChange(next ?? value)}
-          className="relative flex items-center select-none touch-none w-full h-5"
-          style={{
-            background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${percentage}%, var(--border) ${percentage}%, var(--border) 100%)`,
-            borderRadius: '999px',
-            height: '4px'
-          }}
+          className="relative flex items-center select-none touch-none w-full h-4"
         />
 
-        <div className="mt-4 flex justify-between px-1 text-[10px] font-medium text-[var(--text-muted)]">
+        <div className="flex justify-between px-0.5 text-[9px] text-[var(--text-muted)] mt-0.5">
           <span>{formattedValue(min)}</span>
-          <span>{formattedValue((min + max) / 2)}</span>
           <span>{formattedValue(max)}</span>
         </div>
       </div>
 
-      {error && <p className="text-xs font-medium text-[var(--danger)]">{error}</p>}
-      <style>{`
-        .SliderThumb {
-          width: 18px; height: 18px;
-          background: var(--accent);
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-      `}</style>
+      {error && (
+        <p className="text-[10px] text-[var(--danger)]">{error}</p>
+      )}
     </div>
   );
 }
@@ -1071,6 +1394,7 @@ import { StressTestChart } from "../../components/charts/StressTestChart";
 import { WealthFanChart } from "../../components/charts/WealthFanChart";
 import { HeroVerdict } from "../../components/dashboard/HeroVerdict";
 import { StatCard } from "../../components/dashboard/StatCard";
+import { TaxBreakdownPanel } from "../../components/dashboard/TaxBreakdownPanel";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
@@ -1146,6 +1470,7 @@ export function MainPanel() {
               <TabsTrigger value="spending">Spending Plan</TabsTrigger>
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
+              <TabsTrigger value="tax">Tax Breakdown</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-4">
@@ -1154,6 +1479,7 @@ export function MainPanel() {
             <TabsContent value="spending"><SpendingSmileChart /></TabsContent>
             <TabsContent value="scenarios"><ScenarioCompareChart /></TabsContent>
             <TabsContent value="stress"><StressTestChart /></TabsContent>
+            <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
           </CardContent>
         </Card>
       </Tabs>
@@ -1258,7 +1584,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/too
 import { AgeInput } from "../../components/inputs/AgeInput";
 import { CurrencyInput } from "../../components/inputs/CurrencyInput";
 import { SliderInput } from "../../components/inputs/SliderInput";
-import { getInvestableAssets, getTotalNetWorth } from "../../engine/monteCarlo";
+import { getInvestableAssets, getTotalNetWorth, calculateSmartSpendingDefaults } from "../../engine/monteCarlo";
 import { formatCompactCurrency } from "../../lib/formatters";
 import { cn } from "../../lib/utils";
 import { useSimStore } from "../../store/useSimStore";
@@ -1283,19 +1609,21 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const addLumpyEvent = useSimStore((state) => state.addLumpyEvent);
   const updateLumpyEvent = useSimStore((state) => state.updateLumpyEvent);
   const removeLumpyEvent = useSimStore((state) => state.removeLumpyEvent);
+  const applySmartSpendingDefaults = useSimStore((state) => state.applySmartSpendingDefaults);
   
   const investable = getInvestableAssets(inputs);
   const totalNW = getTotalNetWorth(inputs);
   const gross = investable + inputs.illiquidAssets;
   const liquidPct = gross > 0 ? (investable / gross) * 100 : 0;
+  const spendingDefaults = calculateSmartSpendingDefaults(inputs);
 
   return (
     <aside className={`${mobile ? "max-h-[85vh]" : "h-[calc(100vh-56px)] lg:sticky lg:top-[56px]"} sidebar-scroll flex flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)]`}>
       <div className="flex-1 overflow-y-auto p-5 pb-32">
         <Accordion type="multiple" defaultValue={["you", "assets"]} className="grid gap-3">
-          <AccordionItem value="you" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="you" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>You & Your Spouse <Chip>Retire {inputs.retirementAge}</Chip></AccordionTrigger>
-            <AccordionContent className="grid gap-4">
+            <AccordionContent className="grid gap-2">
               <AgeInput label="Your current age" value={inputs.currentAge} min={30} max={70} error={errors.currentAge} onChange={(value) => setInput("currentAge", value)} />
               <AgeInput label="Your retirement age" value={inputs.retirementAge} min={40} max={75} error={errors.retirementAge} onChange={(value) => setInput("retirementAge", value)} />
               <AgeInput label="Live to age" value={inputs.planningAge} min={75} max={100} error={errors.planningAge} onChange={(value) => setInput("planningAge", value)} />
@@ -1312,27 +1640,44 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="assets" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="assets" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Your Assets <Chip>{formatCompactCurrency(investable)} liquid</Chip></AccordionTrigger>
-            <AccordionContent className="grid gap-4">
+            <AccordionContent className="grid gap-2">
               <CurrencyInput label="Taxable Brokerage" value={inputs.taxableAssets} onChange={(v) => setInput("taxableAssets", v)} />
-              <CurrencyInput label="401k / IRA" value={inputs.taxDeferredAssets} onChange={(v) => setInput("taxDeferredAssets", v)} />
-              <CurrencyInput label="Roth IRA" value={inputs.taxFreeAssets} onChange={(v) => setInput("taxFreeAssets", v)} />
-              <CurrencyInput label="Illiquid Assets" value={inputs.illiquidAssets} onChange={(v) => setInput("illiquidAssets", v)} />
+              <CurrencyInput label="Traditional (401K / IRA)" value={inputs.taxDeferredAssets} onChange={(v) => setInput("taxDeferredAssets", v)} />
+              <CurrencyInput label="Roth (401K / IRA)" value={inputs.taxFreeAssets} onChange={(v) => setInput("taxFreeAssets", v)} />
+              <CurrencyInput label="Illiquid Assets (incl. Home)" value={inputs.illiquidAssets} onChange={(v) => setInput("illiquidAssets", v)} />
               <CurrencyInput label="Cash Reserves" value={inputs.cashReserves} onChange={(v) => setInput("cashReserves", v)} />
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="spending" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="spending" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
               Spending Plan
               <Chip>{formatCompactCurrency(inputs.spendingGoGo)}/yr</Chip>
             </AccordionTrigger>
-            <AccordionContent className="grid gap-4">
+            <AccordionContent className="grid gap-2">
               <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
                 The spending smile: high spending in active retirement,
                 less in mid-retirement, then healthcare costs rise late.
               </p>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-[var(--text-primary)]">
+                    Smart suggestion
+                  </p>
+                  <p className="text-[9px] text-[var(--text-muted)]">
+                    Go-Go: {formatCompactCurrency(spendingDefaults.goGo)}/yr
+                    based on {spendingDefaults.basis}
+                  </p>
+                </div>
+                <button
+                  onClick={applySmartSpendingDefaults}
+                  className="rounded border border-[var(--accent)] bg-[var(--accent)]/10 px-2 py-1 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors"
+                >
+                  Apply
+                </button>
+              </div>
               <SliderInput 
                 label="Go-Go spending (active early retirement)" 
                 value={inputs.spendingGoGo} 
@@ -1383,20 +1728,20 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="market" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="market" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Market <Chip>{(inputs.expectedReturn * 100).toFixed(1)}% Return</Chip></AccordionTrigger>
-            <AccordionContent className="grid gap-4">
+            <AccordionContent className="grid gap-2">
               <SliderInput label="Expected Return" value={inputs.expectedReturn} min={0.01} max={0.15} step={0.005} format="percent" onChange={(v) => setInput("expectedReturn", v)} />
               <SliderInput label="Volatility" value={inputs.volatility} min={0.01} max={0.3} step={0.01} format="percent" onChange={(v) => setInput("volatility", v)} />
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="income" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="income" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
               Income & Social Security
               <Chip>SS {inputs.socialSecurityAge}</Chip>
             </AccordionTrigger>
-            <AccordionContent className="grid gap-4">
+            <AccordionContent className="grid gap-2">
               <CurrencyInput label="Your annual salary (pre-retirement)" value={inputs.annualSalary} max={2000000} step={25000} onChange={(v) => setInput('annualSalary', v)} />
               {inputs.hasSpouse && (
                 <CurrencyInput label="Spouse annual salary" value={inputs.spouseAnnualSalary} max={2000000} step={25000} onChange={(v) => setInput('spouseAnnualSalary', v)} />
@@ -1419,14 +1764,14 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="tax" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="tax" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
               Tax & Savings
               <Chip>
                 {(inputs.stateIncomeTaxRate * 100).toFixed(0)}% state
               </Chip>
             </AccordionTrigger>
-            <AccordionContent className="grid gap-4">
+            <AccordionContent className="grid gap-2">
               <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
                 Federal taxes use 2024 MFJ or Single brackets with 
                 standard deduction and child tax credits. FICA applies 
@@ -1461,7 +1806,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               <SliderInput label="Pre-tax savings rate" value={inputs.preTaxSavingsRate} min={0} max={0.30} step={0.01} format="percent" onChange={(v) => setInput('preTaxSavingsRate', v)} />
               <SliderInput label="After-tax savings rate" value={inputs.afterTaxSavingsRate} min={0} max={0.60} step={0.01} format="percent" onChange={(v) => setInput('afterTaxSavingsRate', v)} />
               
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-3 grid gap-2">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2 grid gap-2">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Estimated Tax Breakdown</p>
                 {(() => {
                   const combined = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
@@ -1497,10 +1842,10 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="events" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="events" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Lumpy Events <Chip>{inputs.lumpyEvents.length}</Chip></AccordionTrigger>
-            <AccordionContent className="grid gap-4">
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-3">
+            <AccordionContent className="grid gap-2">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2">
                 <p className="text-[11px] font-bold text-[var(--text-primary)] mb-1">What are lumpy events?</p>
                 <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
                   One-time cash events like carried interest, real estate sales, or capital calls.
@@ -1538,7 +1883,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               {inputs.lumpyEvents.length === 0 && <p className="text-center text-xs text-[var(--text-muted)] py-4">No events added yet.</p>}
 
               {inputs.lumpyEvents.map((event) => (
-                <div key={event.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 grid gap-3">
+                <div key={event.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3 grid gap-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className={cn("px-2 py-0.5 rounded text-[9px] font-bold border", event.amount >= 0 ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20" : "bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/20")}>
@@ -1588,9 +1933,9 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="liabilities" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="liabilities" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Liabilities & Obligations <Chip>{formatCompactCurrency(inputs.mortgageBalance)}</Chip></AccordionTrigger>
-            <AccordionContent className="grid gap-4">
+            <AccordionContent className="grid gap-2">
               <CurrencyInput label="Mortgage balance" value={inputs.mortgageBalance} max={3000000} onChange={(v) => setInput('mortgageBalance', v)} />
               <CurrencyInput label="Annual mortgage payment" value={inputs.mortgageAnnualPayment} max={250000} step={5000} onChange={(v) => setInput('mortgageAnnualPayment', v)} />
               <SliderInput label="Years remaining on mortgage" value={inputs.mortgageYearsRemaining} min={0} max={30} step={1} onChange={(v) => setInput('mortgageYearsRemaining', v)} />
@@ -1598,12 +1943,12 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="college" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-5 py-4">
+          <AccordionItem value="college" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>College & Kids <Chip>{inputs.collegeEvents.length} kids</Chip></AccordionTrigger>
-            <AccordionContent className="grid gap-4">
+            <AccordionContent className="grid gap-2">
               <p className="text-[11px] text-[var(--text-muted)]">College costs modeled as annual withdrawals net of 529 savings.</p>
               {inputs.collegeEvents.map((event) => (
-                <div key={event.id} className="rounded-lg border border-[var(--border)] bg-white/[0.03] p-3 grid gap-3">
+                <div key={event.id} className="rounded-lg border border-[var(--border)] bg-white/[0.03] p-2 grid gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-[var(--text-primary)]">{event.childName}</span>
                     <button className="text-[var(--danger)] text-xs" onClick={() => {
@@ -1655,7 +2000,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
         </Accordion>
       </div>
 
-      <div className="sticky bottom-0 border-t border-[var(--border)] bg-[var(--bg-secondary)] p-4">
+      <div className="sticky bottom-0 border-t border-[var(--border)] bg-[var(--bg-secondary)] p-3">
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
           <div className="border-r border-[var(--border)] pr-4">
             <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Net Worth</p>
@@ -1698,7 +2043,7 @@ export function AccordionTrigger({
     <AccordionPrimitive.Header>
       <AccordionPrimitive.Trigger
         className={cn(
-          "flex w-full items-center justify-between gap-3 py-3 text-left text-sm font-semibold text-primaryText",
+          "flex w-full items-center justify-between gap-3 py-2 text-left text-sm font-semibold text-primaryText",
           className,
         )}
         {...props}
@@ -2267,16 +2612,20 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
         annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, yearIndex) : 0;
         
         const isRetired = age >= inputs.retirementAge;
-        const taxResult = calculateTaxes(
-          annualGrossIncome, inputs, isRetired
-        );
-        // During working years: save a % of after-tax income
-        const afterTaxSpendable = taxResult.afterTaxIncome;
-        const savedAmount = isRetired 
-          ? afterTaxSpendable  // in retirement, all income supplements wealth
-          : afterTaxSpendable * inputs.afterTaxSavingsRate;
+        const taxResult = calculateTaxes(annualGrossIncome, inputs, isRetired);
         
-        wealth += isRetired ? afterTaxSpendable : savedAmount;
+        if (isRetired) {
+          // In retirement: all after-tax income supplements the portfolio
+          // (SS, pension, other income reduces portfolio withdrawals)
+          wealth += taxResult.afterTaxIncome;
+        } else {
+          // During accumulation:
+          // 1. Pre-tax savings go directly to wealth pool
+          const preTaxContributions = annualGrossIncome * inputs.preTaxSavingsRate;
+          // 2. After-tax savings from take-home pay
+          const afterTaxSaved = taxResult.afterTaxIncome * inputs.afterTaxSavingsRate;
+          wealth += preTaxContributions + afterTaxSaved;
+        }
         
         wealth += lumpyEventCashFlow(age, inputs.lumpyEvents);
         wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);
@@ -2323,6 +2672,46 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
   };
 }
 
+export function getAccumulationSummary(inputs: SimInputs): {
+  yearsToRetirement: number;
+  startingAssets: number;
+  estimatedRetirementAssets: number;
+  annualSavings: number;
+  combinedGrossIncome: number;
+  combinedNetIncome: number;
+  preTaxSavings: number;
+  afterTaxSavings: number;
+  effectiveTaxRate: number;
+} {
+  const combinedGross = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
+  const taxResult = calculateTaxes(combinedGross, inputs, false);
+  const preTaxSavings = combinedGross * inputs.preTaxSavingsRate;
+  const afterTaxSavings = taxResult.afterTaxIncome * inputs.afterTaxSavingsRate;
+  const totalAnnualSavings = preTaxSavings + afterTaxSavings;
+  const yearsToRetirement = inputs.retirementAge - inputs.currentAge;
+  
+  // Simple compound growth estimate for display purposes
+  const growthFactor = Math.pow(1 + inputs.expectedReturn, yearsToRetirement);
+  const startingAssets = getInvestableAssets(inputs);
+  
+  // Future value of lump sum + future value of an annuity
+  const estimatedRetirementAssets = 
+    startingAssets * growthFactor + 
+    totalAnnualSavings * ((growthFactor - 1) / inputs.expectedReturn);
+  
+  return {
+    yearsToRetirement,
+    startingAssets,
+    estimatedRetirementAssets,
+    annualSavings: totalAnnualSavings,
+    combinedGrossIncome: combinedGross,
+    combinedNetIncome: taxResult.afterTaxIncome,
+    preTaxSavings,
+    afterTaxSavings,
+    effectiveTaxRate: taxResult.effectiveRate,
+  };
+}
+
 export function solveSustainableSpend(inputs: SimInputs, targetSuccessRate = 0.85): number {
   let low = 25_000;
   let high = 750_000;
@@ -2333,6 +2722,47 @@ export function solveSustainableSpend(inputs: SimInputs, targetSuccessRate = 0.8
     else high = mid;
   }
   return low / 12;
+}
+
+export function calculateSmartSpendingDefaults(
+  inputs: SimInputs
+): {
+  goGo: number;
+  slowGo: number;
+  noGo: number;
+  basis: string;
+} {
+  const combinedGross = inputs.annualSalary + 
+    (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
+  const taxResult = calculateTaxes(combinedGross, inputs, false);
+  const combinedNetIncome = taxResult.afterTaxIncome;
+  
+  const investable = getInvestableAssets(inputs);
+  
+  // Method A: 65% income replacement
+  const incomeReplacementSpend = combinedNetIncome * 0.65;
+  
+  // Method B: 4.5% of investable assets
+  const assetBasedSpend = investable * 0.045;
+  
+  // Use the lower of the two, floored at $60K, capped at $500K
+  const goGo = Math.max(60000, Math.min(500000,
+    Math.min(incomeReplacementSpend, assetBasedSpend)
+  ));
+  
+  // Round to nearest $5K for cleanliness
+  const roundedGoGo = Math.round(goGo / 5000) * 5000;
+  
+  const basis = assetBasedSpend < incomeReplacementSpend
+    ? 'asset-based (4.5% of investable)'
+    : 'income-based (65% of net income)';
+  
+  return {
+    goGo: roundedGoGo,
+    slowGo: Math.round(roundedGoGo * 0.75 / 5000) * 5000,
+    noGo: Math.round(roundedGoGo * 0.60 / 5000) * 5000,
+    basis,
+  };
 }
 
 export { getSpendingForAge } from "./spendingSmile";
@@ -2429,9 +2859,9 @@ export const DEFAULT_INPUTS: SimInputs = {
   spouseSocialSecurityAge: 67,
   spouseSocialSecurityAmount: 32400,  // $2,700/month Ã— 12
   otherRetirementIncome: 0,
-  spendingGoGo: 280_000,
-  spendingSlowGo: 200_000,
-  spendingNoGo: 150_000,
+  spendingGoGo: 175_000,
+  spendingSlowGo: 130_000,
+  spendingNoGo: 105_000,
   goGoYears: 10,
   slowGoYears: 10,
   healthcareSurgeAmount: 45_000,
@@ -2613,7 +3043,7 @@ export function cn(...inputs: ClassValue[]) {
 // Reset button clears saved state and restores defaults
 
 import { create } from "zustand";
-import { runSimulation } from "../engine/monteCarlo";
+import { runSimulation, calculateSmartSpendingDefaults } from "../engine/monteCarlo";
 import { DEFAULT_INPUTS } from "../lib/constants";
 import type { InputErrors, LumpyEvent, Scenario, SimInputs, SimResults } from "../types";
 
@@ -2631,6 +3061,7 @@ interface SimStore {
   updateLumpyEvent: (event: LumpyEvent) => void;
   removeLumpyEvent: (id: string) => void;
   resetInputs: () => void;
+  applySmartSpendingDefaults: () => void;
 }
 
 const STORAGE_KEY = 'terminus-inputs-v1';
@@ -2756,6 +3187,19 @@ export const useSimStore = create<SimStore>((set, get) => {
     resetInputs: () => {
       localStorage.removeItem(STORAGE_KEY);
       set({ inputs: DEFAULT_INPUTS });
+      scheduleRun(get, set);
+    },
+    applySmartSpendingDefaults: () => {
+      const inputs = get().inputs;
+      const defaults = calculateSmartSpendingDefaults(inputs);
+      set((state) => ({
+        inputs: {
+          ...state.inputs,
+          spendingGoGo: defaults.goGo,
+          spendingSlowGo: defaults.slowGo,
+          spendingNoGo: defaults.noGo,
+        }
+      }));
       scheduleRun(get, set);
     }
   };

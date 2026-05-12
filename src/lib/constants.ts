@@ -50,7 +50,6 @@ export const DEFAULT_INPUTS: SimInputs = {
       confidence: "high",
     },
   ],
-  numKids: 2,
   collegeEvents: [
     {
       id: "college-1",

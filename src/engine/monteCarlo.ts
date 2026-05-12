@@ -11,7 +11,7 @@ function randomNormal(): number {
 
 function logNormalReturn(mu: number, sigma: number): number {
   const z = randomNormal();
-  return Math.exp(mu - 0.5 * sigma ** 2 + sigma * z) - 1;
+  return (1 + mu) * Math.exp(sigma * z) - 1;
 }
 
 function percentile(values: number[], target: number): number {
@@ -22,19 +22,50 @@ function percentile(values: number[], target: number): number {
 }
 
 // TODO: Move these to a central tax configuration or user inputs
-const ESTIMATED_ORDINARY_TAX_RATE = 0.40;
-const ESTIMATED_LTCG_TAX_RATE = 0.24;
+// Federal-only rate estimates. State tax added dynamically from inputs.
+const FEDERAL_ORDINARY_TAX_RATE = 0.37;
+const FEDERAL_LTCG_TAX_RATE = 0.20;
+// LTCG add-on for net investment income tax (applies to high earners)
+const NIIT_RATE = 0.038;
 
-function taxableEventAmount(event: LumpyEvent): number {
-  if (event.taxType === "ordinary") return event.amount * (1 - ESTIMATED_ORDINARY_TAX_RATE);
-  if (event.taxType === "ltcg") return event.amount * (1 - ESTIMATED_LTCG_TAX_RATE);
+// Estimated federal marginal rate applied to IRA/401k distributions in
+// retirement. Reflects the 22% bracket where most distributions land
+// when stacked with Social Security. State tax is added separately.
+const ESTIMATED_RETIREMENT_ORDINARY_RATE = 0.22;
+
+function taxableEventAmount(event: LumpyEvent, inputs: SimInputs): number {
+  if (event.taxType === "ordinary") {
+    const effectiveRate = Math.min(FEDERAL_ORDINARY_TAX_RATE + inputs.stateIncomeTaxRate, 0.70);
+    return event.amount * (1 - effectiveRate);
+  }
+  if (event.taxType === "ltcg") {
+    const effectiveRate = Math.min(FEDERAL_LTCG_TAX_RATE + NIIT_RATE + inputs.stateIncomeTaxRate, 0.55);
+    return event.amount * (1 - effectiveRate);
+  }
   return event.amount;
 }
 
-function lumpyEventCashFlow(age: number, events: LumpyEvent[]): number {
+function estimateWithdrawalTax(
+  portfolioDraw: number,
+  deferredFraction: number,
+  taxableFraction: number,
+  inputs: SimInputs
+): number {
+  if (portfolioDraw <= 0) return 0;
+  // Traditional IRA/401k draws: taxed as ordinary income
+  const deferredDraw = portfolioDraw * deferredFraction;
+  const ordinaryTax = deferredDraw * (ESTIMATED_RETIREMENT_ORDINARY_RATE + inputs.stateIncomeTaxRate);
+  // Taxable brokerage draws: taxed at LTCG rate (assumes long-held positions)
+  const taxableDraw = portfolioDraw * taxableFraction;
+  const ltcgTax = taxableDraw * (FEDERAL_LTCG_TAX_RATE + NIIT_RATE);
+  // Roth/tax-free draws: zero tax (implicitly the remainder)
+  return ordinaryTax + ltcgTax;
+}
+
+function lumpyEventCashFlow(age: number, events: LumpyEvent[], inputs: SimInputs): number {
   return events.reduce((total, event) => {
     if (event.year !== age || Math.random() > event.probability) return total;
-    return total + taxableEventAmount(event);
+    return total + taxableEventAmount(event, inputs);
   }, 0);
 }
 
@@ -42,10 +73,9 @@ function collegeCashFlow(age: number, events: CollegeEvent[], inflationRate: num
   return events.reduce((total, event) => {
     const endAge = event.startYear + event.years;
     if (age < event.startYear || age >= endAge) return total;
-    const yearIndex = age - event.startYear;
     const inflatedCost = event.annualCost * Math.pow(1 + inflationRate, Math.max(0, age - currentAge));
-    const savingsOffset = yearIndex === 0 ? Math.min(event.existingSavings529, inflatedCost) : 0;
-    return total - Math.max(0, inflatedCost - savingsOffset);
+    const annualSavingsOffset = Math.min(event.existingSavings529 / event.years, inflatedCost);
+    return total - Math.max(0, inflatedCost - annualSavingsOffset);
   }, 0);
 }
 
@@ -209,8 +239,14 @@ function stressReturn(baseReturn: number, inputs: SimInputs, yearIndex: number, 
   if (yearIndex === 1 && stressScenario.yearTwoReturn !== undefined) return { annualReturn: stressScenario.yearTwoReturn, inflationRate: inputs.inflationRate };
   if (yearIndex === 2 && stressScenario.yearThreeReturn !== undefined) return { annualReturn: stressScenario.yearThreeReturn, inflationRate: inputs.inflationRate };
   if (stressScenario.years !== undefined && yearIndex < stressScenario.years) {
+    // Apply overrideReturn as a mean shift on the stochastic baseReturn.
+    // This shifts the average return toward the stress scenario target
+    // while preserving the full Monte Carlo variance across paths.
+    const annualReturn = stressScenario.overrideReturn !== undefined
+      ? baseReturn + (stressScenario.overrideReturn - inputs.expectedReturn)
+      : baseReturn;
     return {
-      annualReturn: stressScenario.overrideReturn ?? baseReturn,
+      annualReturn,
       inflationRate: stressScenario.overrideInflation ?? inputs.inflationRate,
     };
   }
@@ -222,21 +258,24 @@ export function computeStackedBands(
   startingAssets: number,
   retirementAge: number,
   planningAge: number,
+  inflationRate: number,
+  currentAge: number,
 ): StackedBandDataPoint[] {
   const firstPath = paths[0];
   if (!firstPath) return [];
-  const currentAge = planningAge - firstPath.length + 1;
 
   return firstPath.map((_, index) => {
     const age = currentAge + index;
     const values = paths.map((path) => path[index] ?? 0);
     
     const total = paths.length;
+    const yearsElapsed = age - currentAge;
+    const realThreshold = startingAssets * Math.pow(1 + inflationRate, yearsElapsed);
     const brokeCount = values.filter(v => v <= 0).length;
-    const strugglingCount = values.filter(v => v > 0 && v <= startingAssets * 0.5).length;
-    const survivingCount = values.filter(v => v > startingAssets * 0.5 && v <= startingAssets).length;
-    const thrivingCount = values.filter(v => v > startingAssets && v <= startingAssets * 2).length;
-    const flourishingCount = values.filter(v => v > startingAssets * 2).length;
+    const strugglingCount = values.filter(v => v > 0 && v <= realThreshold * 0.5).length;
+    const survivingCount = values.filter(v => v > realThreshold * 0.5 && v <= realThreshold).length;
+    const thrivingCount = values.filter(v => v > realThreshold && v <= realThreshold * 2).length;
+    const flourishingCount = values.filter(v => v > realThreshold * 2).length;
 
     const dead = age >= retirementAge ? getCumulativeMortality(retirementAge, age) : 0;
     const livingPct = Math.max(0, 100 - dead);
@@ -272,6 +311,12 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
   let ruinedPaths = 0;
   const startingAssets = getInvestableAssets(inputs);
 
+  // Constant proxies for the deferred/taxable asset mix.
+  // Used to estimate the tax character of portfolio withdrawals in retirement.
+  const totalInvestableForTax = Math.max(1, startingAssets);
+  const deferredFraction = inputs.taxDeferredAssets / totalInvestableForTax;
+  const taxableFraction = inputs.taxableAssets / totalInvestableForTax;
+
   for (let simulationIndex = 0; simulationIndex < inputs.numSimulations; simulationIndex += 1) {
     let wealth = Math.max(0, startingAssets);
     let ruined = false;
@@ -292,10 +337,16 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
         // Calculate Gross Incomes
         let annualGrossIncome = salaryIncome(age, inputs.currentAge, inputs.retirementAge, inputs.annualSalary, inputs.inflationRate);
         annualGrossIncome += inputs.hasSpouse
-          ? salaryIncome(age, inputs.spouseCurrentAge, inputs.spouseRetirementAge, inputs.spouseAnnualSalary, inputs.inflationRate)
+          ? salaryIncome(
+              age - (inputs.currentAge - inputs.spouseCurrentAge),
+              inputs.spouseCurrentAge,
+              inputs.spouseRetirementAge,
+              inputs.spouseAnnualSalary,
+              inputs.inflationRate
+            )
           : 0;
         annualGrossIncome += socialSecurityIncome(age, inputs);
-        annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, yearIndex) : 0;
+        annualGrossIncome += age >= inputs.retirementAge ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge) : 0;
         
         const isRetired = age >= inputs.retirementAge;
         const taxResult = calculateTaxes(annualGrossIncome, inputs, isRetired);
@@ -306,18 +357,29 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
           wealth += taxResult.afterTaxIncome;
         } else {
           // During accumulation:
-          // 1. Pre-tax savings go directly to wealth pool
+          // 1. Pre-tax savings go directly to wealth pool (tax-deferred)
           const preTaxContributions = annualGrossIncome * inputs.preTaxSavingsRate;
-          // 2. After-tax savings from take-home pay
-          const afterTaxSaved = taxResult.afterTaxIncome * inputs.afterTaxSavingsRate;
+          // 2. True take-home: gross minus pre-tax contributions minus all taxes
+          const trueAfterTaxTakeHome = Math.max(0, taxResult.afterTaxIncome - preTaxContributions);
+          // 3. After-tax savings from actual take-home
+          const afterTaxSaved = trueAfterTaxTakeHome * inputs.afterTaxSavingsRate;
           wealth += preTaxContributions + afterTaxSaved;
         }
         
-        wealth += lumpyEventCashFlow(age, inputs.lumpyEvents);
+        wealth += lumpyEventCashFlow(age, inputs.lumpyEvents, inputs);
         wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);
-        wealth -= age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
-        wealth -= yearIndex < inputs.mortgageYearsRemaining ? inputs.mortgageAnnualPayment : 0;
+        if (wealth > 0) {
+          wealth -= age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
+          wealth -= yearIndex < inputs.mortgageYearsRemaining ? inputs.mortgageAnnualPayment : 0;
+        }
         wealth -= spending;
+        // In retirement: apply tax on the net portfolio draw.
+        // portfolioDraw is the gap between spending and income already
+        // covered by Social Security, pension, and other taxed sources.
+        if (isRetired) {
+          const portfolioDraw = Math.max(0, spending - taxResult.afterTaxIncome);
+          wealth -= estimateWithdrawalTax(portfolioDraw, deferredFraction, taxableFraction, inputs);
+        }
         wealth = Math.max(0, wealth);
       }
 
@@ -349,7 +411,7 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
   return {
     paths,
     percentilePaths,
-    stackedBands: computeStackedBands(paths, startingAssets, inputs.retirementAge, inputs.planningAge),
+    stackedBands: computeStackedBands(paths, startingAssets, inputs.retirementAge, inputs.planningAge, inputs.inflationRate, inputs.currentAge),
     ruinProbability,
     medianTerminalWealth: percentile(terminalWealth, 50),
     successRate,
@@ -401,10 +463,23 @@ export function getAccumulationSummary(inputs: SimInputs): {
 export function solveSustainableSpend(inputs: SimInputs, targetSuccessRate = 0.85): number {
   let low = 25_000;
   let high = 750_000;
+  const trialsPerPoint = 2;
+  const simCount = Math.min(inputs.numSimulations, 400);
   for (let i = 0; i < 10; i += 1) {
     const mid = (low + high) / 2;
-    const result = runSimulation({ ...inputs, spendingGoGo: mid, spendingSlowGo: mid * 0.75, spendingNoGo: mid * 0.6, numSimulations: Math.min(inputs.numSimulations, 500) });
-    if (result.successRate >= targetSuccessRate) low = mid;
+    const baseParams = {
+      ...inputs,
+      spendingGoGo: mid,
+      spendingSlowGo: mid * 0.75,
+      spendingNoGo: mid * 0.6,
+      numSimulations: simCount,
+    };
+    let totalSuccess = 0;
+    for (let t = 0; t < trialsPerPoint; t++) {
+      totalSuccess += runSimulation(baseParams).successRate;
+    }
+    const avgSuccessRate = totalSuccess / trialsPerPoint;
+    if (avgSuccessRate >= targetSuccessRate) low = mid;
     else high = mid;
   }
   return low / 12;
