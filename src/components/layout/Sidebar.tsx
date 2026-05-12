@@ -11,17 +11,11 @@ import { getInvestableAssets, getTotalNetWorth, calculateSmartSpendingDefaults }
 import { formatCompactCurrency } from "../../lib/formatters";
 import { cn } from "../../lib/utils";
 import { useSimStore } from "../../store/useSimStore";
-import type { LumpyEvent } from "../../types";
+import type { CarryAward } from "../../types";
 import { AnimatedNumber } from "../../components/ui/AnimatedNumber";
 
 function Chip({ children }: { children: React.ReactNode }) {
   return <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-muted)]">{children}</span>;
-}
-
-function confidenceToProbability(confidence: LumpyEvent["confidence"]) {
-  if (confidence === "low") return 0.4;
-  if (confidence === "high") return 0.9;
-  return 0.7;
 }
 
 export function Sidebar({ mobile = false }: { mobile?: boolean }) {
@@ -29,9 +23,9 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const errors = useSimStore((state) => state.errors);
   const setInput = useSimStore((state) => state.setInput);
   const setInputs = useSimStore((state) => state.setInputs);
-  const addLumpyEvent = useSimStore((state) => state.addLumpyEvent);
-  const updateLumpyEvent = useSimStore((state) => state.updateLumpyEvent);
-  const removeLumpyEvent = useSimStore((state) => state.removeLumpyEvent);
+  const addCarryAward = useSimStore((state) => state.addCarryAward);
+  const updateCarryAward = useSimStore((state) => state.updateCarryAward);
+  const removeCarryAward = useSimStore((state) => state.removeCarryAward);
   const applySmartSpendingDefaults = useSimStore((state) => state.applySmartSpendingDefaults);
   
   const investable = getInvestableAssets(inputs);
@@ -265,94 +259,50 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="events" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
-            <AccordionTrigger>Lumpy Events <Chip>{inputs.lumpyEvents.length}</Chip></AccordionTrigger>
+          <AccordionItem value="carry" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+            <AccordionTrigger>Carry Awards <Chip>{inputs.carryAwards.length}</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2">
-                <p className="text-[11px] font-bold text-[var(--text-primary)] mb-1">What are lumpy events?</p>
+                <p className="text-[11px] font-bold text-[var(--text-primary)] mb-1">Private Equity Carry</p>
                 <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                  One-time cash events like carried interest, real estate sales, or capital calls.
-                  Confidence affects how often this fires across simulations.
+                  Add your carry awards. Distributions follow a 12-year curve starting from the vintage year.
                 </p>
               </div>
 
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">Quick Add</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'Carry', type: 'carry', sub: 'LTCG Taxed' },
-                    { label: 'RE Sale', type: 're', sub: 'LTCG Taxed' },
-                    { label: 'Bonus', type: 'bonus', sub: 'Ordinary Tax' },
-                    { label: 'Cap Call', type: 'call', sub: 'Outflow' },
-                  ].map(btn => (
-                    <button
-                      key={btn.type}
-                      onClick={() => {
-                        const defaults = btn.type === 'carry' ? { label: "Carry Distribution", taxType: "ltcg" as const, amount: 1500000, confidence: "medium" as const, probability: 0.7 }
-                          : btn.type === 're' ? { label: "Real Estate Sale", taxType: "ltcg" as const, amount: 800000, confidence: "medium" as const, probability: 0.8 }
-                          : btn.type === 'bonus' ? { label: "Annual Bonus", taxType: "ordinary" as const, amount: 300000, confidence: "high" as const, probability: 0.9 }
-                          : { label: "Capital Call", taxType: "none" as const, amount: -250000, confidence: "high" as const, probability: 1.0 };
-                        addLumpyEvent({ id: Math.random().toString(36).substr(2, 9), year: inputs.currentAge + 5, ...defaults });
-                      }}
-                      className="flex flex-col items-start rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2.5 text-left hover:border-[var(--accent)] transition-colors"
-                    >
-                      <span className="text-xs font-bold text-[var(--text-primary)]">{btn.label}</span>
-                      <span className="text-[9px] text-[var(--text-muted)] mt-0.5">{btn.sub}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {inputs.carryAwards.length === 0 && <p className="text-center text-xs text-[var(--text-muted)] py-4">No carry awards added.</p>}
 
-              {inputs.lumpyEvents.length === 0 && <p className="text-center text-xs text-[var(--text-muted)] py-4">No events added yet.</p>}
-
-              {inputs.lumpyEvents.map((event) => (
-                <div key={event.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3 grid gap-2">
+              {inputs.carryAwards.map((award) => (
+                <div key={award.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3 grid gap-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={cn("px-2 py-0.5 rounded text-[9px] font-bold border", event.amount >= 0 ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20" : "bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/20")}>
-                        {event.amount >= 0 ? "INFLOW" : "OUTFLOW"}
-                      </span>
-                      <span className={cn("px-2 py-0.5 rounded text-[9px] font-bold border", event.taxType === 'ltcg' ? "bg-teal-400/10 text-teal-400 border-teal-400/20" : event.taxType === 'ordinary' ? "bg-amber-400/10 text-amber-400 border-amber-400/20" : "bg-slate-400/10 text-slate-400 border-slate-400/20")}>
-                        {event.taxType === 'ltcg' ? 'LTCG' : event.taxType === 'ordinary' ? 'ORDINARY' : 'NO TAX'}
-                      </span>
-                    </div>
-                    <button onClick={() => removeLumpyEvent(event.id)} className="text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded p-1 transition-colors"><Trash2 size={14} /></button>
+                    <span className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Award Item</span>
+                    <button onClick={() => removeCarryAward(award.id)} className="text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded p-1 transition-colors"><Trash2 size={14} /></button>
                   </div>
-                  <Input value={event.label} onChange={(e) => updateLumpyEvent({ ...event, label: e.target.value })} className="h-8 text-xs" />
-                  <div className="grid grid-cols-2 gap-3">
+                  <Input value={award.label} onChange={(e) => updateCarryAward({ ...award, label: e.target.value })} className="h-8 text-xs" />
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="grid gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Age</label>
-                      <Input type="number" value={event.year} min={inputs.currentAge} max={inputs.planningAge} onChange={(e) => updateLumpyEvent({ ...event, year: Number(e.target.value) })} className="h-8 text-xs" />
+                      <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Vintage</label>
+                      <Input type="number" value={award.vintageYear} onChange={(e) => updateCarryAward({ ...award, vintageYear: Number(e.target.value) })} className="h-8 text-xs" />
                     </div>
                     <div className="grid gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Amount</label>
-                      <div className="relative">
-                        <span className={cn("absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold", event.amount >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]")}>{event.amount >= 0 ? "+$" : "-$"}</span>
-                        <Input type="number" value={Math.abs(event.amount)} onChange={(e) => { const val = Number(e.target.value); const sign = event.amount >= 0 ? 1 : -1; updateLumpyEvent({ ...event, amount: val * sign }); }} className={cn("h-8 pl-7 text-xs font-semibold", event.amount >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]")} />
-                      </div>
+                      <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Total Pool ($)</label>
+                      <Input type="number" value={award.totalPoolValue} onChange={(e) => updateCarryAward({ ...award, totalPoolValue: Number(e.target.value) })} className="h-8 text-xs" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Confidence</label>
-                      <div className="flex gap-1">
-                        {([{ k: 'low', l: '40%' }, { k: 'medium', l: '70%' }, { k: 'high', l: '90%' }] as const).map(c => (
-                          <button key={c.k} onClick={() => updateLumpyEvent({ ...event, confidence: c.k, probability: c.k === 'low' ? 0.4 : c.k === 'high' ? 0.9 : 0.7 })} className={cn("flex-1 rounded py-1 text-[9px] font-bold transition-colors", event.confidence === c.k ? "bg-[var(--accent)] text-white" : "bg-white/10 text-[var(--text-muted)]")}>{c.l}</button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Tax Type</label>
-                      <select value={event.taxType} onChange={(e) => updateLumpyEvent({ ...event, taxType: e.target.value as any })} className="h-8 rounded-md border border-[var(--border)] bg-[var(--bg-primary)] px-2 text-[10px] text-[var(--text-primary)]">
-                        <option value="none">No Tax</option>
-                        <option value="ltcg">LTCG (~24%)</option>
-                        <option value="ordinary">Ordinary (~37%)</option>
-                      </select>
-                    </div>
-                  </div>
+                  <SliderInput 
+                    label="Your Share" 
+                    value={award.poolValueCapture} 
+                    min={0} max={0.05} step={0.001} format="percent"
+                    onChange={(v) => updateCarryAward({ ...award, poolValueCapture: v })} 
+                  />
+                  <SliderInput 
+                    label="Vested" 
+                    value={award.vestedPercent} 
+                    min={0} max={1} step={0.01} format="percent"
+                    onChange={(v) => updateCarryAward({ ...award, vestedPercent: v })} 
+                  />
                 </div>
               ))}
-              <Button onClick={() => addLumpyEvent({ id: Math.random().toString(36).substr(2, 9), label: "Custom Event", year: inputs.currentAge + 5, amount: 0, probability: 1, taxType: "none", confidence: "medium" })} variant="secondary" className="w-full text-xs border-dashed"><Plus size={14} className="mr-2" /> Add Event</Button>
+              <Button onClick={() => addCarryAward({ id: Math.random().toString(36).substr(2, 9), label: "New Carry Award", vintageYear: new Date().getFullYear(), totalPoolValue: 50_000_000, poolValueCapture: 0.005, vestedPercent: 0, gpCommitPercent: 0.01 })} variant="secondary" className="w-full text-xs border-dashed"><Plus size={14} className="mr-2" /> Add Carry Award</Button>
             </AccordionContent>
           </AccordionItem>
 

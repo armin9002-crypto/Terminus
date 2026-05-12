@@ -1,6 +1,6 @@
-import { SSA_MORTALITY_QX } from "../lib/constants";
+import { SSA_MORTALITY_QX, CARRY_DISTRIBUTION_CURVE } from "../lib/constants";
 import { formatCompactCurrency, formatPercentage } from "../lib/formatters";
-import type { CollegeEvent, LumpyEvent, PercentilesAtAge, SimInputs, SimResults, StackedBandDataPoint, StressScenario } from "../types";
+import type { CarryAward, CollegeEvent, PercentilesAtAge, SimInputs, SimResults, StackedBandDataPoint, StressScenario } from "../types";
 import { getSpendingForAge } from "./spendingSmile";
 
 function randomNormal(): number {
@@ -33,18 +33,6 @@ const NIIT_RATE = 0.038;
 // when stacked with Social Security. State tax is added separately.
 const ESTIMATED_RETIREMENT_ORDINARY_RATE = 0.22;
 
-function taxableEventAmount(event: LumpyEvent, inputs: SimInputs): number {
-  if (event.taxType === "ordinary") {
-    const effectiveRate = Math.min(FEDERAL_ORDINARY_TAX_RATE + inputs.stateIncomeTaxRate, 0.70);
-    return event.amount * (1 - effectiveRate);
-  }
-  if (event.taxType === "ltcg") {
-    const effectiveRate = Math.min(FEDERAL_LTCG_TAX_RATE + NIIT_RATE + inputs.stateIncomeTaxRate, 0.55);
-    return event.amount * (1 - effectiveRate);
-  }
-  return event.amount;
-}
-
 function estimateWithdrawalTax(
   portfolioDraw: number,
   deferredFraction: number,
@@ -62,13 +50,6 @@ function estimateWithdrawalTax(
   return ordinaryTax + ltcgTax;
 }
 
-function lumpyEventCashFlow(age: number, events: LumpyEvent[], inputs: SimInputs): number {
-  return events.reduce((total, event) => {
-    if (event.year !== age || Math.random() > event.probability) return total;
-    return total + taxableEventAmount(event, inputs);
-  }, 0);
-}
-
 function collegeCashFlow(age: number, events: CollegeEvent[], inflationRate: number, currentAge: number): number {
   return events.reduce((total, event) => {
     const endAge = event.startYear + event.years;
@@ -77,6 +58,46 @@ function collegeCashFlow(age: number, events: CollegeEvent[], inflationRate: num
     const annualSavingsOffset = Math.min(event.existingSavings529 / event.years, inflatedCost);
     return total - Math.max(0, inflatedCost - annualSavingsOffset);
   }, 0);
+}
+
+// Returns net carry distributions (after LTCG tax) and GP commit
+// outflows separately so the withdrawal tax model can use them correctly.
+function carryAwardCashFlows(
+  calendarYear: number,
+  awards: CarryAward[],
+  inputs: SimInputs
+): { netIncome: number; gpCommits: number } {
+  let netIncome = 0;
+  let gpCommits = 0;
+
+  for (const award of awards) {
+    const fundYear = calendarYear - award.vintageYear + 1;
+
+    // GP commit: called straight-line over first 3 fund years
+    if (fundYear >= 1 && fundYear <= 3) {
+      gpCommits += (award.totalPoolValue * award.gpCommitPercent) / 3;
+    }
+
+    // Distribution: apply curve, capture discount, and vesting scalar
+    if (fundYear >= 1 && fundYear <= 12) {
+      const curvePct = CARRY_DISTRIBUTION_CURVE[fundYear - 1] ?? 0;
+      if (curvePct > 0) {
+        const gross =
+          award.totalPoolValue *
+          award.poolValueCapture *
+          award.vestedPercent *
+          curvePct;
+        // Tax at LTCG + NIIT + state rate (carry is long-term capital gain)
+        const taxRate = Math.min(
+          FEDERAL_LTCG_TAX_RATE + NIIT_RATE + inputs.stateIncomeTaxRate,
+          0.55
+        );
+        netIncome += gross * (1 - taxRate);
+      }
+    }
+  }
+
+  return { netIncome, gpCommits };
 }
 
 function salaryIncome(age: number, currentAge: number, retirementAge: number, salary: number, inflationRate: number): number {
@@ -325,6 +346,7 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
 
     for (let yearIndex = 0; yearIndex < horizon; yearIndex += 1) {
       const age = inputs.currentAge + yearIndex;
+      const calendarYear = inputs.simulationStartYear + yearIndex;
       const baseReturn = logNormalReturn(inputs.expectedReturn, inputs.volatility);
       const stressed = stressReturn(baseReturn, inputs, yearIndex, stressScenario);
       const spending = getSpendingForAge(age, inputs.retirementAge, { ...inputs, inflationRate: stressed.inflationRate });
@@ -365,8 +387,11 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
           const afterTaxSaved = trueAfterTaxTakeHome * inputs.afterTaxSavingsRate;
           wealth += preTaxContributions + afterTaxSaved;
         }
-        
-        wealth += lumpyEventCashFlow(age, inputs.lumpyEvents, inputs);
+
+        const { netIncome: carryNetIncome, gpCommits: carryGPCommits } =
+          carryAwardCashFlows(calendarYear, inputs.carryAwards, inputs);
+        wealth += carryNetIncome;
+        wealth -= carryGPCommits;
         wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);
         if (wealth > 0) {
           wealth -= age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
@@ -374,10 +399,12 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
         }
         wealth -= spending;
         // In retirement: apply tax on the net portfolio draw.
-        // portfolioDraw is the gap between spending and income already
-        // covered by Social Security, pension, and other taxed sources.
+        // Subtract carry income from the draw since it is already net of LTCG tax.
         if (isRetired) {
-          const portfolioDraw = Math.max(0, spending - taxResult.afterTaxIncome);
+          const portfolioDraw = Math.max(
+            0,
+            spending - taxResult.afterTaxIncome - carryNetIncome
+          );
           wealth -= estimateWithdrawalTax(portfolioDraw, deferredFraction, taxableFraction, inputs);
         }
         wealth = Math.max(0, wealth);

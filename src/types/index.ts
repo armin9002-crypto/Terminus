@@ -28,7 +28,8 @@ export interface SimInputs {
   volatility: number;
   inflationRate: number;
   numSimulations: number;
-  lumpyEvents: LumpyEvent[];
+  carryAwards: CarryAward[];
+  simulationStartYear: number;
   collegeEvents: CollegeEvent[];
   mortgageBalance: number;
   mortgageAnnualPayment: number;
@@ -49,6 +50,16 @@ export interface LumpyEvent {
   probability: number;
   taxType: "ordinary" | "ltcg" | "none";
   confidence: "low" | "medium" | "high";
+}
+
+export interface CarryAward {
+  id: string;
+  label: string;
+  vintageYear: number;
+  totalPoolValue: number;
+  poolValueCapture: number;
+  vestedPercent: number;
+  gpCommitPercent: number;
 }
 
 export interface CollegeEvent {

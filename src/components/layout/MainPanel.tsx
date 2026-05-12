@@ -1,5 +1,6 @@
 import { PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
 import { RichBrokeDeadChart } from "../../components/charts/RichBrokeDeadChart";
+import { CarryAwardsChart } from "../../components/charts/CarryAwardsChart";
 import { ScenarioCompareChart } from "../../components/charts/ScenarioCompareChart";
 import { SpendingSmileChart } from "../../components/charts/SpendingSmileChart";
 import { StressTestChart } from "../../components/charts/StressTestChart";
@@ -83,6 +84,7 @@ export function MainPanel() {
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Tax Breakdown</TabsTrigger>
+              <TabsTrigger value="carry">Carry Awards</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-4">
@@ -92,6 +94,7 @@ export function MainPanel() {
             <TabsContent value="scenarios"><ScenarioCompareChart /></TabsContent>
             <TabsContent value="stress"><StressTestChart /></TabsContent>
             <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
+            <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
           </CardContent>
         </Card>
       </Tabs>

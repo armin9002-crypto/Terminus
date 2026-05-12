@@ -5,7 +5,7 @@
 import { create } from "zustand";
 import { runSimulation, calculateSmartSpendingDefaults } from "../engine/monteCarlo";
 import { DEFAULT_INPUTS } from "../lib/constants";
-import type { InputErrors, LumpyEvent, Scenario, SimInputs, SimResults } from "../types";
+import type { CarryAward, InputErrors, Scenario, SimInputs, SimResults } from "../types";
 
 interface SimStore {
   inputs: SimInputs;
@@ -17,14 +17,14 @@ interface SimStore {
   setInputs: (inputs: Partial<SimInputs>) => void;
   runSimulation: () => void;
   addScenario: (scenario: Scenario) => void;
-  addLumpyEvent: (event: LumpyEvent) => void;
-  updateLumpyEvent: (event: LumpyEvent) => void;
-  removeLumpyEvent: (id: string) => void;
+  addCarryAward: (award: CarryAward) => void;
+  updateCarryAward: (award: CarryAward) => void;
+  removeCarryAward: (id: string) => void;
   resetInputs: () => void;
   applySmartSpendingDefaults: () => void;
 }
 
-const STORAGE_KEY = 'terminus-inputs-v1';
+const STORAGE_KEY = 'terminus-inputs-v2';
 
 function loadSavedInputs(): SimInputs {
   try {
@@ -122,25 +122,27 @@ export const useSimStore = create<SimStore>((set, get) => {
       set({ results: runSimulation(currentInputs), isRunning: false });
     },
     addScenario: (scenario) => set((state) => ({ scenarios: [...state.scenarios, scenario] })),
-    addLumpyEvent: (event) => {
-      set((state) => ({ inputs: { ...state.inputs, lumpyEvents: [...state.inputs.lumpyEvents, event] } }));
+    addCarryAward: (award) => {
+      set((state) => ({
+        inputs: { ...state.inputs, carryAwards: [...state.inputs.carryAwards, award] },
+      }));
       scheduleRun(get, set);
     },
-    updateLumpyEvent: (event) => {
+    updateCarryAward: (award) => {
       set((state) => ({
         inputs: {
           ...state.inputs,
-          lumpyEvents: state.inputs.lumpyEvents.map((item) => (item.id === event.id ? event : item)),
+          carryAwards: state.inputs.carryAwards.map((a) => (a.id === award.id ? award : a)),
         },
       }));
       scheduleRun(get, set);
     },
-    removeLumpyEvent: (id) => {
-      set((state) => ({ 
-        inputs: { 
-          ...state.inputs, 
-          lumpyEvents: state.inputs.lumpyEvents.filter((event) => event.id !== id) 
-        } 
+    removeCarryAward: (id) => {
+      set((state) => ({
+        inputs: {
+          ...state.inputs,
+          carryAwards: state.inputs.carryAwards.filter((a) => a.id !== id),
+        },
       }));
       scheduleRun(get, set);
     },

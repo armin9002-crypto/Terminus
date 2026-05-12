@@ -1,5 +1,22 @@
 import type { SimInputs } from "../types";
 
+// Distribution curve as % of total pool value by fund year (index 0 = Year 1).
+// Represents the expected timing of carry distributions over a 12-year fund life.
+export const CARRY_DISTRIBUTION_CURVE: number[] = [
+  0,      // Year 1
+  0,      // Year 2
+  0.05,   // Year 3
+  0.075,  // Year 4
+  0.10,   // Year 5
+  0.125,  // Year 6
+  0.15,   // Year 7
+  0.15,   // Year 8
+  0.15,   // Year 9
+  0.125,  // Year 10
+  0.05,   // Year 11
+  0.025,  // Year 12
+];
+
 export const DEFAULT_INPUTS: SimInputs = {
   currentAge: 47,
   retirementAge: 55,
@@ -30,26 +47,8 @@ export const DEFAULT_INPUTS: SimInputs = {
   volatility: 0.15,
   inflationRate: 0.028,
   numSimulations: 1000,
-  lumpyEvents: [
-    {
-      id: "carry-1",
-      label: "Carry distribution",
-      year: 52,
-      amount: 1_500_000,
-      probability: 0.7,
-      taxType: "ltcg",
-      confidence: "medium",
-    },
-    {
-      id: "capital-call-1",
-      label: "Capital Call",
-      year: 48,
-      amount: -250000,
-      probability: 1,
-      taxType: "none",
-      confidence: "high",
-    },
-  ],
+  carryAwards: [],
+  simulationStartYear: new Date().getFullYear(),
   collegeEvents: [
     {
       id: "college-1",

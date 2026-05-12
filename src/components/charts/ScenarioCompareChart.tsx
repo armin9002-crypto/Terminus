@@ -27,7 +27,7 @@ export function ScenarioCompareChart() {
 
   useEffect(() => {
     setLoading(true);
-    const baseInputs = noCarry ? { ...inputs, lumpyEvents: [] } : inputs;
+    const baseInputs = noCarry ? { ...inputs, carryAwards: [] } : inputs;
     const reducedInputs = { ...baseInputs, numSimulations: Math.min(baseInputs.numSimulations, 750) };
     
     let index = 0;
