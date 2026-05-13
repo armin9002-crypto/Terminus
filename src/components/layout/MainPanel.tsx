@@ -1,5 +1,6 @@
 import { PiggyBank, ShieldAlert, TrendingUp } from "lucide-react";
 import { RichBrokeDeadChart } from "../../components/charts/RichBrokeDeadChart";
+import { ExecutiveSummary } from "../../components/dashboard/ExecutiveSummary";
 import { CarryAwardsChart } from "../../components/charts/CarryAwardsChart";
 import { ScenarioCompareChart } from "../../components/charts/ScenarioCompareChart";
 import { InfoPage } from "../../components/layout/InfoPage";
@@ -87,6 +88,7 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Income Tax</TabsTrigger>
               <TabsTrigger value="carry">Carry Awards</TabsTrigger>
+              <TabsTrigger value="summary">Executive Summary</TabsTrigger>
               <TabsTrigger value="info" className="data-[state=active]:text-[var(--accent)] border border-transparent data-[state=active]:border-[var(--accent)]/30">
                 How It Works
               </TabsTrigger>
@@ -100,6 +102,7 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
             <TabsContent value="stress"><StressTestChart /></TabsContent>
             <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
             <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
+            <TabsContent value="summary"><ExecutiveSummary /></TabsContent>
             <TabsContent value="info"><InfoPage /></TabsContent>
           </CardContent>
         </Card>

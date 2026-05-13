@@ -338,6 +338,12 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
   const deferredFraction = inputs.taxDeferredAssets / totalInvestableForTax;
   const taxableFraction = inputs.taxableAssets / totalInvestableForTax;
 
+  // Cash earns inflation rate (conservative floor, not equity return).
+  // cashFraction and investedFraction are constant proxies for the life
+  // of the simulation, consistent with how deferredFraction is handled.
+  const cashFraction = inputs.cashReserves / Math.max(1, startingAssets);
+  const investedFraction = 1 - cashFraction;
+
   for (let simulationIndex = 0; simulationIndex < inputs.numSimulations; simulationIndex += 1) {
     let wealth = Math.max(0, startingAssets);
     let ruined = false;
@@ -354,7 +360,12 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
       if (wealth <= 0) {
         wealth = 0;
       } else {
-        wealth = Math.max(0, wealth * (1 + stressed.annualReturn));
+        // Apply differentiated returns: cash earns inflation rate,
+        // invested assets earn the stochastic market return.
+        const blendedReturn =
+          cashFraction * stressed.inflationRate +
+          investedFraction * stressed.annualReturn;
+        wealth = Math.max(0, wealth * (1 + blendedReturn));
         
         // Calculate Gross Incomes
         let annualGrossIncome = salaryIncome(age, inputs.currentAge, inputs.retirementAge, inputs.annualSalary, inputs.inflationRate);
@@ -523,12 +534,15 @@ export function calculateSmartSpendingDefaults(
   const combinedGross = inputs.annualSalary + 
     (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
   const taxResult = calculateTaxes(combinedGross, inputs, false);
-  const combinedNetIncome = taxResult.afterTaxIncome;
+  // True spendable take-home: subtract pre-tax contributions from
+  // afterTaxIncome, which currently includes 401k money in its base.
+  const preTaxContributions = combinedGross * inputs.preTaxSavingsRate;
+  const trueTakeHome = Math.max(0, taxResult.afterTaxIncome - preTaxContributions);
   
   const investable = getInvestableAssets(inputs);
   
-  // Method A: 65% income replacement
-  const incomeReplacementSpend = combinedNetIncome * 0.65;
+  // Method A: 65% income replacement (of true spendable take-home)
+  const incomeReplacementSpend = trueTakeHome * 0.65;
   
   // Method B: 4.5% of investable assets
   const assetBasedSpend = investable * 0.045;
