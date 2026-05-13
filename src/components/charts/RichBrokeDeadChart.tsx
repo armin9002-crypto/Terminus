@@ -44,7 +44,7 @@ export function RichBrokeDeadChart() {
   if (isRunning) {
     return (
       <div className="h-[540px] animate-pulse rounded-lg border border-border bg-[var(--bg-card)] p-6">
-        <div className="h-full rounded-md bg-slate-700/40" />
+        <div className="h-full rounded-md bg-[var(--border)]" />
       </div>
     );
   }
@@ -79,8 +79,8 @@ export function RichBrokeDeadChart() {
 
         {/* Mid-retirement snapshot */}
         {midPoint && (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">
               At age {midAge} (mid-retirement snapshot)
             </p>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">

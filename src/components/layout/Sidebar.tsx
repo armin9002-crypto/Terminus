@@ -36,7 +36,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
     <aside className={`${mobile ? "max-h-[85vh]" : "h-[calc(100vh-56px)] lg:sticky lg:top-[56px]"} sidebar-scroll flex flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)]`}>
       <div className="flex-1 overflow-y-auto p-3 pb-20">
         <Accordion type="multiple" defaultValue={["you", "assets"]} className="grid gap-2">
-          <AccordionItem value="you" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="you" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>You & Your Spouse <Chip>Retire {inputs.retirementAge}</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <div className="grid grid-cols-2 gap-2">
@@ -57,7 +57,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="assets" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="assets" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Your Assets <Chip>{formatCompactCurrency(investable)} liquid</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-1.5">
               <div className="grid grid-cols-2 gap-2">
@@ -85,7 +85,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="spending" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="spending" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
               Spending Plan
               <Chip>{formatCompactCurrency(inputs.spendingGoGo)}/yr</Chip>
@@ -153,7 +153,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="market" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="market" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Market <Chip>{(inputs.expectedReturn * 100).toFixed(1)}% Return</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <SliderInput label="Expected Return" value={inputs.expectedReturn} min={0.01} max={0.15} step={0.005} format="percent" onChange={(v) => setInput("expectedReturn", v)} />
@@ -161,7 +161,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="income" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="income" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
               Income & Social Security
               <Chip>SS {inputs.socialSecurityAge}</Chip>
@@ -183,7 +183,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="tax" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="tax" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
               Tax & Savings
               <Chip>
@@ -254,7 +254,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="carry" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="carry" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
               Carry Awards
               <Chip>
@@ -272,7 +272,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               {inputs.carryAwards.length === 0 && <p className="text-center text-xs text-[var(--text-muted)] py-4">No carry awards added.</p>}
 
               {inputs.carryAwards.map((award) => (
-                <div key={award.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3 grid gap-2">
+                <div key={award.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-3 grid gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Award Item</span>
                     <button onClick={() => removeCarryAward(award.id)} className="text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded p-1 transition-colors"><Trash2 size={14} /></button>
@@ -392,7 +392,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="liabilities" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="liabilities" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Liabilities & Obligations <Chip>{formatCompactCurrency(inputs.mortgageBalance)}</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <CurrencyInput label="Mortgage balance" value={inputs.mortgageBalance} max={3000000} onChange={(v) => setInput('mortgageBalance', v)} />
@@ -402,12 +402,12 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="college" className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
+          <AccordionItem value="college" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>College & Kids <Chip>{inputs.collegeEvents.length} kids</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <p className="text-[11px] text-[var(--text-muted)]">College costs modeled as annual withdrawals net of 529 savings.</p>
               {inputs.collegeEvents.map((event) => (
-                <div key={event.id} className="rounded-lg border border-[var(--border)] bg-white/[0.03] p-2 grid gap-2">
+                <div key={event.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2 grid gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-[var(--text-primary)]">{event.childName}</span>
                     <button className="text-[var(--danger)] text-xs" onClick={() => {

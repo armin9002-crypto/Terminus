@@ -20,7 +20,12 @@ function ruinTone(ruinProbability: number) {
   return "success";
 }
 
-export function MainPanel() {
+interface MainPanelProps {
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
+}
+
+export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
   const inputs = useSimStore((state) => state.inputs);
   const results = useSimStore((state) => state.results);
   const errors = useSimStore((state) => state.errors);
@@ -31,12 +36,12 @@ export function MainPanel() {
     <section className="grid gap-3 p-3 pb-24 md:pb-3 lg:p-4">
       {hasErrors ? <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm font-semibold text-red-200">Fix inputs above to update simulation</div> : null}
       
-      <div className={`overflow-hidden transition-all duration-300 ${
+      <div className={`overflow-hidden transition-all duration-500 ${
         isRunning ? 'max-h-10 opacity-100' : 'max-h-0 opacity-0'
       }`}>
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-2 text-sm font-semibold text-[var(--accent)]">
-          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
-          Recalculating simulation...
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--accent)]">
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
+          Recalculating...
         </div>
       </div>
 
@@ -71,7 +76,7 @@ export function MainPanel() {
           sparklineColor="#22c55e"
         />
       </div>
-      <Tabs defaultValue="rich">
+      <Tabs value={activeTab} onValueChange={onTabChange}>
         <Card className="shadow-none">
           <CardHeader className="p-3">
             <TabsList className="w-full overflow-x-auto">
@@ -82,7 +87,9 @@ export function MainPanel() {
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Income Tax</TabsTrigger>
               <TabsTrigger value="carry">Carry Awards</TabsTrigger>
-              <TabsTrigger value="info">How It Works</TabsTrigger>
+              <TabsTrigger value="info" className="data-[state=active]:text-[var(--accent)] border border-transparent data-[state=active]:border-[var(--accent)]/30">
+                How It Works
+              </TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-3">

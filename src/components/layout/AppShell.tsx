@@ -1,4 +1,4 @@
-import { HelpCircle, Menu, Share2, X } from "lucide-react";
+import { BookOpen, HelpCircle, Menu, Share2, X } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "../../lib/useTheme";
 import { Theme } from "../../lib/theme";
@@ -13,6 +13,7 @@ import { Sidebar } from "./Sidebar";
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("rich");
   const { theme, setTheme } = useTheme();
   const isRunning = useSimStore((state) => state.isRunning);
   const numSimulations = useSimStore((state) => state.inputs.numSimulations);
@@ -68,6 +69,13 @@ export function AppShell() {
               Live Model
             </div>
             <span className="rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">{formatCompactCurrency(numSimulations).replace("$", "")} runs</span>
+            <button
+              onClick={() => setActiveTab("info")}
+              className="hidden sm:flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-1 text-xs font-semibold text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+            >
+              <BookOpen size={13} />
+              How It Works
+            </button>
             <Button variant="ghost" className="size-9 px-0" aria-label="Share" onClick={() => { setToast(true); window.setTimeout(() => setToast(false), 1800); }}><Share2 size={17} /></Button>
             <Tooltip>
               <TooltipTrigger asChild><Button variant="ghost" className="size-9 px-0" aria-label="Help"><HelpCircle size={17} /></Button></TooltipTrigger>
@@ -79,7 +87,7 @@ export function AppShell() {
       {toast ? <div className="fixed right-4 top-24 z-50 rounded-lg border border-border bg-[#1e293b] px-4 py-3 text-sm shadow-terminal">Share links coming soon.</div> : null}
       <div className="grid lg:grid-cols-[380px_minmax(0,1fr)]">
         <div className="hidden lg:block"><Sidebar /></div>
-        <MainPanel />
+        <MainPanel activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
       <Button className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 gap-2 md:hidden" onClick={() => setMobileOpen(true)}><Menu size={16} /> Edit Inputs</Button>
       {mobileOpen ? (
