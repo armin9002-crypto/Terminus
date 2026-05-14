@@ -135,3 +135,17 @@ input[type="number"] {
 :root[data-theme="sepia"] .recharts-text {
   fill: #a08060;
 }
+
+:root[data-theme="light"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #e2e8f0 !important;
+}
+:root[data-theme="sepia"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #4a3728 !important;
+}
+
+:root[data-theme="light"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #e2e8f0 !important;
+}
+:root[data-theme="sepia"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #4a3728 !important;
+}

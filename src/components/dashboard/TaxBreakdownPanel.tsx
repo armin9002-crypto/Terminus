@@ -90,7 +90,7 @@ export function TaxBreakdownPanel() {
   const fedTaxAfterCredit = Math.max(0, totalFedTax - effectiveChildCredit);
   
   // FICA
-  const ficaSS = Math.min(combinedGross, 168600) * 0.062;
+  const ficaSS = Math.min(combinedGross, 176100) * 0.062;
   const ficaMedicare = combinedGross * 0.0145;
   const addlMedicareThreshold = isMFJ ? 250000 : 200000;
   const addlMedicare = Math.max(0, combinedGross - addlMedicareThreshold) * 0.009;
@@ -213,7 +213,7 @@ export function TaxBreakdownPanel() {
             Federal Tax Brackets
           </p>
           <p className="text-[10px] text-[var(--text-muted)] mb-3">
-            2024 {isMFJ ? 'Married Filing Jointly' : 'Single'} | 
+            2025 {isMFJ ? 'Married Filing Jointly' : 'Single'} | 
             AGI: {formatCompactCurrency(agi)} | 
             Marginal rate: {(marginalRate * 100).toFixed(0)}%
           </p>

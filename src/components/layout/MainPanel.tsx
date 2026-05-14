@@ -9,6 +9,12 @@ import { WealthFanChart } from "../../components/charts/WealthFanChart";
 import { HeroVerdict } from "../../components/dashboard/HeroVerdict";
 import { StatCard } from "../../components/dashboard/StatCard";
 import { TaxBreakdownPanel } from "../../components/dashboard/TaxBreakdownPanel";
+import { SensitivityTornadoChart } from "./SensitivityTornadoChart";
+import { TaxDragTimelineChart } from "./TaxDragTimelineChart";
+import { BucketDepletionChart } from "./BucketDepletionChart";
+import { RetirementIncomeWaterfallChart } from "./RetirementIncomeWaterfallChart";
+import { WithdrawalRateChart } from "./WithdrawalRateChart";
+import { ExecutiveSummary } from "../../components/dashboard/ExecutiveSummary";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
@@ -86,7 +92,9 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Income Tax</TabsTrigger>
+              <TabsTrigger value="cashflows">Cash Flows</TabsTrigger>
               <TabsTrigger value="carry">Carry Awards</TabsTrigger>
+              <TabsTrigger value="summary">Executive Summary</TabsTrigger>
               <TabsTrigger value="info" className="data-[state=active]:text-[var(--accent)] border border-transparent data-[state=active]:border-[var(--accent)]/30">
                 How It Works
               </TabsTrigger>
@@ -94,12 +102,38 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
           </CardHeader>
           <CardContent className="p-3">
             <TabsContent value="rich"><RichBrokeDeadChart /></TabsContent>
-            <TabsContent value="wealth"><WealthFanChart /></TabsContent>
+            <TabsContent value="wealth">
+              <div className="grid gap-8">
+                <WealthFanChart />
+                <div className="h-px bg-[var(--border)]" />
+                <BucketDepletionChart />
+              </div>
+            </TabsContent>
             <TabsContent value="spending"><SpendingSmileChart /></TabsContent>
             <TabsContent value="scenarios"><ScenarioCompareChart /></TabsContent>
-            <TabsContent value="stress"><StressTestChart /></TabsContent>
-            <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
+            <TabsContent value="stress">
+              <div className="grid gap-8">
+                <StressTestChart />
+                <div className="h-px bg-[var(--border)]" />
+                <SensitivityTornadoChart />
+              </div>
+            </TabsContent>
+            <TabsContent value="tax">
+              <div className="grid gap-8">
+                <TaxBreakdownPanel />
+                <div className="h-px bg-[var(--border)]" />
+                <TaxDragTimelineChart />
+              </div>
+            </TabsContent>
+            <TabsContent value="cashflows">
+              <div className="grid gap-8">
+                <RetirementIncomeWaterfallChart />
+                <div className="h-px bg-[var(--border)]" />
+                <WithdrawalRateChart />
+              </div>
+            </TabsContent>
             <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
+            <TabsContent value="summary"><ExecutiveSummary /></TabsContent>
             <TabsContent value="info"><InfoPage /></TabsContent>
           </CardContent>
         </Card>
