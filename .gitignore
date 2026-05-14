@@ -15,3 +15,4 @@ dev-server.err.log
 
 .DS_Store
 Thumbs.db
+*.code-workspace

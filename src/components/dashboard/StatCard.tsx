@@ -29,7 +29,7 @@ export function StatCard({ icon: Icon, label, value, description, tone = "neutra
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mutedText">{label}</p>
             <p className={cn("mt-2 text-2xl font-bold transition-colors duration-300", toneClass[tone])}>{value}</p>
           </div>
-          <div className="rounded-md border border-[var(--border)] bg-[var(--bg-secondary)] p-1.5 text-[var(--accent)]">
+          <div className="rounded-md border border-border bg-white/[0.04] p-1.5 text-teal-200">
             <Icon size={16} />
           </div>
         </div>
