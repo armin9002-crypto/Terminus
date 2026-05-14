@@ -27,12 +27,16 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
       setSustainableSpend(null);
       return;
     }
+    let cancelled = false;
     const timer = setTimeout(() => {
       const spend = solveSustainableSpend(inputs);
-      setSustainableSpend(spend);
+      if (!cancelled) setSustainableSpend(spend);
     }, 600);
-    return () => clearTimeout(timer);
-  }, [results?.successRate, inputs.retirementAge, inputs.planningAge, inputs.taxableAssets, inputs.taxDeferredAssets, inputs.taxFreeAssets]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [inputs, results]);
 
   return (
     <section className={cn("rounded-lg border border-border border-l-4 bg-card p-4 shadow-terminal", activeTone.border)}>

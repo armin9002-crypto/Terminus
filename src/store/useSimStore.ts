@@ -3,7 +3,7 @@
 // Reset button clears saved state and restores defaults
 
 import { create } from "zustand";
-import { runSimulation, calculateSmartSpendingDefaults } from "../engine/monteCarlo";
+import { runSimulation, calculateSmartSpendingDefaults, solveSustainableSpend } from "../engine/monteCarlo";
 import { DEFAULT_INPUTS } from "../lib/constants";
 import type { CarryAward, InputErrors, Scenario, SimInputs, SimResults } from "../types";
 
@@ -212,12 +212,21 @@ export const useSimStore = create<SimStore>((set, get) => {
     applySmartSpendingDefaults: () => {
       const inputs = get().inputs;
       const defaults = calculateSmartSpendingDefaults(inputs);
+      const sustainableMonthly = solveSustainableSpend({
+        ...inputs,
+        numSimulations: Math.min(inputs.numSimulations, 600),
+      });
+      const sustainableAnnual = sustainableMonthly * 12;
+      const goGo = Number.isFinite(sustainableAnnual) && sustainableAnnual >= 60_000
+        ? Math.min(500_000, sustainableAnnual)
+        : defaults.goGo;
+      const roundedGoGo = Math.round(goGo / 5_000) * 5_000;
       set((state) => ({
         inputs: {
           ...state.inputs,
-          spendingGoGo: defaults.goGo,
-          spendingSlowGo: defaults.slowGo,
-          spendingNoGo: defaults.noGo,
+          spendingGoGo: roundedGoGo,
+          spendingSlowGo: Math.round(roundedGoGo * 0.75 / 5_000) * 5_000,
+          spendingNoGo: Math.round(roundedGoGo * 0.60 / 5_000) * 5_000,
         }
       }));
       scheduleRun(get, set);

@@ -6,9 +6,11 @@ import { useSimStore } from "../../store/useSimStore";
 import { formatCompactCurrency } from "../../lib/formatters";
 import { CARRY_DISTRIBUTION_CURVE } from "../../lib/constants";
 import type { SimInputs } from "../../types";
+import { getSpendingForAge } from "../../engine/spendingSmile";
 
 interface WaterfallYear {
   age: number;
+  salaryIncome: number;
   ssIncome: number;
   carryIncome: number;
   otherIncome: number;
@@ -34,22 +36,29 @@ function computeWaterfallData(inputs: SimInputs): WaterfallYear[] {
 
   const result: WaterfallYear[] = [];
 
-  for (let age = inputs.retirementAge; age <= inputs.planningAge; age++) {
+  for (let age = inputs.currentAge; age <= inputs.planningAge; age++) {
     const calYear = inputs.simulationStartYear + (age - inputs.currentAge);
-    const ri = age - inputs.retirementAge;
-    const inf = Math.pow(1 + inputs.inflationRate, ri);
-    let spending: number;
-    if (ri < inputs.goGoYears) spending = inputs.spendingGoGo * inf;
-    else if (ri < inputs.goGoYears + inputs.slowGoYears) spending = inputs.spendingSlowGo * inf;
-    else spending = (inputs.spendingNoGo + inputs.healthcareSurgeAmount) * inf;
+    const yearsFromNow = age - inputs.currentAge;
+    const retirementIndex = Math.max(0, age - inputs.retirementAge);
+    const retirementSpending = getSpendingForAge(age, inputs.retirementAge, inputs);
+
+    const primarySalary = age < inputs.retirementAge
+      ? inputs.annualSalary * Math.pow(1 + inputs.inflationRate, yearsFromNow)
+      : 0;
+    const spouseAge = age - (inputs.currentAge - inputs.spouseCurrentAge);
+    const spouseSalary = inputs.hasSpouse && spouseAge < inputs.spouseRetirementAge
+      ? inputs.spouseAnnualSalary * Math.pow(1 + inputs.inflationRate, Math.max(0, spouseAge - inputs.spouseCurrentAge))
+      : 0;
+    const salaryGross = primarySalary + spouseSalary;
+    const salaryAfterTaxAndSavings = salaryGross * Math.max(0, 1 - ORD_RATE - inputs.preTaxSavingsRate - inputs.afterTaxSavingsRate);
 
     let ssGross = 0;
     if (age >= inputs.socialSecurityAge) {
       const yInf = Math.max(0, age - inputs.socialSecurityAge);
       ssGross += inputs.socialSecurityAmount * getSsFactor(inputs.socialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, yInf);
     }
-    if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
-      const yInf = Math.max(0, age - inputs.spouseSocialSecurityAge);
+    if (inputs.hasSpouse && spouseAge >= inputs.spouseSocialSecurityAge) {
+      const yInf = Math.max(0, spouseAge - inputs.spouseSocialSecurityAge);
       ssGross += inputs.spouseSocialSecurityAmount * getSsFactor(inputs.spouseSocialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, yInf);
     }
     const ssAfterTax = ssGross * (1 - 0.85 * ORD_RATE * 0.6);
@@ -67,20 +76,30 @@ function computeWaterfallData(inputs: SimInputs): WaterfallYear[] {
     }
 
     const otherGross = inputs.otherRetirementIncome > 0
-      ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, ri)
+      ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, retirementIndex)
       : 0;
     const otherAfterTax = otherGross * (1 - ORD_RATE);
+    const collegeOutflow = inputs.collegeEvents.reduce((sum, event) => {
+      if (age < event.startYear || age >= event.startYear + event.years) return sum;
+      const inflatedCost = event.annualCost * Math.pow(1 + inputs.inflationRate, yearsFromNow);
+      const savingsOffset = Math.min(event.existingSavings529 / Math.max(1, event.years), inflatedCost);
+      return sum + Math.max(0, inflatedCost - savingsOffset);
+    }, 0);
+    const mortgageOutflow = yearsFromNow < inputs.mortgageYearsRemaining ? inputs.mortgageAnnualPayment : 0;
+    const capitalCalls = age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
+    const totalOutflows = retirementSpending + mortgageOutflow + capitalCalls + collegeOutflow;
 
-    const nonPortfolio = ssAfterTax + carryNet + otherAfterTax;
-    const portfolioDraw = Math.max(0, spending - nonPortfolio);
+    const nonPortfolio = salaryAfterTaxAndSavings + ssAfterTax + carryNet + otherAfterTax;
+    const portfolioDraw = Math.max(0, totalOutflows - nonPortfolio);
 
     result.push({
       age,
+      salaryIncome: Math.round(salaryAfterTaxAndSavings),
       ssIncome: Math.round(ssAfterTax),
       carryIncome: Math.round(carryNet),
       otherIncome: Math.round(otherAfterTax),
       portfolioDraw: Math.round(portfolioDraw),
-      totalSpending: Math.round(spending),
+      totalSpending: Math.round(totalOutflows),
     });
   }
   return result;
@@ -90,9 +109,10 @@ export function RetirementIncomeWaterfallChart() {
   const inputs = useSimStore((s) => s.inputs);
   const data = computeWaterfallData(inputs);
 
-  const horizon = inputs.planningAge - inputs.retirementAge;
+  const horizon = inputs.planningAge - inputs.currentAge;
   const displayData = horizon > 25 ? data.filter((_, i) => i % 2 === 0) : data;
   const firstMajorDrawYear = data.find(d => d.portfolioDraw / Math.max(1, d.totalSpending) > 0.5);
+  const totalSalary = data.reduce((s, d) => s + d.salaryIncome, 0);
   const totalSS = data.reduce((s, d) => s + d.ssIncome, 0);
   const totalCarry = data.reduce((s, d) => s + d.carryIncome, 0);
   const totalDraw = data.reduce((s, d) => s + d.portfolioDraw, 0);
@@ -102,10 +122,9 @@ export function RetirementIncomeWaterfallChart() {
   return (
     <div className="grid gap-4">
       <div>
-        <p className="text-sm font-bold text-[var(--text-primary)]">Retirement Income Sources</p>
+        <p className="text-sm font-bold text-[var(--text-primary)]">Cash Flow Sources by Age</p>
         <p className="text-xs text-[var(--text-muted)] mt-0.5">
-          How annual spending is covered year-by-year. Stacked bars show SS (blue),
-          carry distributions (teal), other income (green), and portfolio draw (orange).
+          Starts at your current age and shows how annual obligations are covered before and after retirement. Stacked bars show salary net of estimated taxes/savings, SS, carry, other income, and portfolio draw.
           {firstMajorDrawYear && ` Portfolio becomes the majority income source at age ${firstMajorDrawYear.age}.`}
         </p>
       </div>
@@ -122,11 +141,13 @@ export function RetirementIncomeWaterfallChart() {
               labelFormatter={(age) => `Age ${age}`}
             />
             <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 11 }} />
+            <Bar dataKey="salaryIncome" name="Salary net of tax/savings" stackId="a" fill="#6366f1" fillOpacity={0.85} />
             <Bar dataKey="ssIncome" name="Social Security (after tax)" stackId="a" fill="#38bdf8" fillOpacity={0.85} />
             <Bar dataKey="carryIncome" name="Carry Distributions (net)" stackId="a" fill="#14b8a6" fillOpacity={0.85} />
             <Bar dataKey="otherIncome" name="Other Income (after tax)" stackId="a" fill="#22c55e" fillOpacity={0.85} />
             <Bar dataKey="portfolioDraw" name="Portfolio Draw" stackId="a" fill="#f97316" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
-            <Line dataKey="totalSpending" name="Total Spending" stroke="#f1f5f9" strokeWidth={1.5} dot={false} type="monotone" strokeDasharray="4 2" />
+            <Line dataKey="totalSpending" name="Total Outflows" stroke="#f1f5f9" strokeWidth={1.5} dot={false} type="monotone" strokeDasharray="4 2" />
+            <ReferenceLine x={inputs.retirementAge} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: "Retire", fill: "#f59e0b", fontSize: 10, position: "insideTopLeft" }} />
             <ReferenceLine x={inputs.socialSecurityAge} stroke="#38bdf8" strokeDasharray="3 3" label={{ value: "SS", fill: "#38bdf8", fontSize: 10, position: "insideTopLeft" }} />
           </ComposedChart>
         </ResponsiveContainer>
@@ -134,6 +155,7 @@ export function RetirementIncomeWaterfallChart() {
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
+          { label: "Net Salary", value: formatCompactCurrency(totalSalary), color: "#818cf8" },
           { label: "Total SS (lifetime)", value: formatCompactCurrency(totalSS), color: "#38bdf8" },
           { label: "Total Carry (lifetime)", value: formatCompactCurrency(totalCarry), color: "#14b8a6" },
           { label: "Total Portfolio Draw", value: formatCompactCurrency(totalDraw), color: "#f97316" },

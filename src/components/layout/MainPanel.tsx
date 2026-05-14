@@ -85,8 +85,8 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
       </div>
       <Tabs value={activeTab} onValueChange={onTabChange}>
         <Card className="shadow-none">
-          <CardHeader className="p-3">
-            <TabsList className="w-full overflow-x-auto">
+          <CardHeader className="sticky top-[56px] z-20 border-b border-[var(--border)] bg-[var(--bg-card)]/95 p-3 backdrop-blur md:static md:border-b-0 md:bg-transparent md:backdrop-blur-none">
+            <TabsList className="w-full overflow-x-auto whitespace-nowrap">
               <TabsTrigger value="rich">Rich/Broke/Dead</TabsTrigger>
               <TabsTrigger value="wealth">Wealth Trajectories</TabsTrigger>
               <TabsTrigger value="spending">Spending Plan</TabsTrigger>

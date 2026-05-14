@@ -22,8 +22,8 @@ export function AppShell() {
   const themeOrder = ['dark', 'light', 'sepia'] as const;
   const themeLabels: Record<string, string> = {
     dark: 'Dark',
-    light: 'Light', 
-    sepia: 'Sepia'
+    light: 'Graphite',
+    sepia: 'Midnight'
   };
 
   const cycleTheme = () => {
@@ -50,8 +50,8 @@ export function AppShell() {
           >
             <span className="h-2 w-2 rounded-full" style={{
               background: theme === 'dark' ? '#14b8a6' 
-                : theme === 'light' ? '#0d9488' 
-                : '#d4956a'
+                : theme === 'light' ? '#2dd4bf'
+                : '#38bdf8'
             }} />
             {themeLabels[theme]}
           </button>

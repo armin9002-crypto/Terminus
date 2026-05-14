@@ -14,12 +14,13 @@ export function useTheme() {
     localStorage.setItem('terminus-theme', theme);
 
     if (theme === 'light') {
-      document.body.style.background = '#f8fafc';
-      document.body.style.color = '#0f172a';
+      document.body.style.background =
+        'radial-gradient(circle at top left, rgba(45,212,191,0.14), transparent 28rem), linear-gradient(135deg, #0b1220 0%, #111827 48%, #0f172a 100%)';
+      document.body.style.color = '#f8fafc';
     } else if (theme === 'sepia') {
       document.body.style.background = 
-        'linear-gradient(135deg, #1c1510 0%, #241d16 48%, #1c1510 100%)';
-      document.body.style.color = '#f5e6d3';
+        'radial-gradient(circle at top left, rgba(56,189,248,0.13), transparent 28rem), linear-gradient(135deg, #101015 0%, #181922 48%, #111827 100%)';
+      document.body.style.color = '#f8fafc';
     } else {
       document.body.style.background = 
         'radial-gradient(circle at top left, rgba(20,184,166,0.16), transparent 28rem), linear-gradient(135deg, #0f1117 0%, #101522 48%, #121827 100%)';

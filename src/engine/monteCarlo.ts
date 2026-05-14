@@ -21,33 +21,73 @@ function percentile(values: number[], target: number): number {
   return sorted[index] ?? 0;
 }
 
-// TODO: Move these to a central tax configuration or user inputs
 // Federal-only rate estimates. State tax added dynamically from inputs.
-const FEDERAL_ORDINARY_TAX_RATE = 0.37;
 const FEDERAL_LTCG_TAX_RATE = 0.20;
 // LTCG add-on for net investment income tax (applies to high earners)
 const NIIT_RATE = 0.038;
 
-// Estimated federal marginal rate applied to IRA/401k distributions in
-// retirement. Reflects the 22% bracket where most distributions land
-// when stacked with Social Security. State tax is added separately.
+// Estimated federal marginal rate applied to IRA/401k withdrawals in retirement.
 const ESTIMATED_RETIREMENT_ORDINARY_RATE = 0.22;
 
-function estimateWithdrawalTax(
-  portfolioDraw: number,
-  deferredFraction: number,
-  taxableFraction: number,
-  inputs: SimInputs
-): number {
-  if (portfolioDraw <= 0) return 0;
-  // Traditional IRA/401k draws: taxed as ordinary income
-  const deferredDraw = portfolioDraw * deferredFraction;
-  const ordinaryTax = deferredDraw * (ESTIMATED_RETIREMENT_ORDINARY_RATE + inputs.stateIncomeTaxRate);
-  // Taxable brokerage draws: taxed at LTCG rate (assumes long-held positions)
-  const taxableDraw = portfolioDraw * taxableFraction;
-  const ltcgTax = taxableDraw * (FEDERAL_LTCG_TAX_RATE + NIIT_RATE);
-  // Roth/tax-free draws: zero tax (implicitly the remainder)
-  return ordinaryTax + ltcgTax;
+interface PortfolioBuckets {
+  taxable: number;
+  taxDeferred: number;
+  taxFree: number;
+  cash: number;
+}
+
+function totalPortfolio(buckets: PortfolioBuckets): number {
+  return buckets.taxable + buckets.taxDeferred + buckets.taxFree + buckets.cash;
+}
+
+function applyPortfolioReturns(buckets: PortfolioBuckets, annualReturn: number, cashReturn: number): PortfolioBuckets {
+  return {
+    taxable: Math.max(0, buckets.taxable * (1 + annualReturn)),
+    taxDeferred: Math.max(0, buckets.taxDeferred * (1 + annualReturn)),
+    taxFree: Math.max(0, buckets.taxFree * (1 + annualReturn)),
+    cash: Math.max(0, buckets.cash * (1 + cashReturn)),
+  };
+}
+
+function drawFromBucket(balance: number, netNeeded: number, taxRate: number): { nextBalance: number; netCovered: number } {
+  if (balance <= 0 || netNeeded <= 0) return { nextBalance: balance, netCovered: 0 };
+  const afterTaxRate = Math.max(0.01, 1 - taxRate);
+  const grossNeeded = netNeeded / afterTaxRate;
+  const grossDraw = Math.min(balance, grossNeeded);
+  return {
+    nextBalance: balance - grossDraw,
+    netCovered: grossDraw * afterTaxRate,
+  };
+}
+
+function withdrawNetAmount(netAmount: number, buckets: PortfolioBuckets, inputs: SimInputs): PortfolioBuckets {
+  let remaining = Math.max(0, netAmount);
+  let next = { ...buckets };
+  if (remaining <= 0 || totalPortfolio(next) <= 0) return next;
+
+  const cashDraw = Math.min(next.cash, remaining);
+  next.cash -= cashDraw;
+  remaining -= cashDraw;
+
+  const taxableRate = Math.min(FEDERAL_LTCG_TAX_RATE + NIIT_RATE + inputs.stateIncomeTaxRate, 0.55);
+  const taxableDraw = drawFromBucket(next.taxable, remaining, taxableRate);
+  next.taxable = taxableDraw.nextBalance;
+  remaining -= taxableDraw.netCovered;
+
+  const deferredRate = Math.min(ESTIMATED_RETIREMENT_ORDINARY_RATE + inputs.stateIncomeTaxRate, 0.55);
+  const deferredDraw = drawFromBucket(next.taxDeferred, remaining, deferredRate);
+  next.taxDeferred = deferredDraw.nextBalance;
+  remaining -= deferredDraw.netCovered;
+
+  const taxFreeDraw = Math.min(next.taxFree, remaining);
+  next.taxFree -= taxFreeDraw;
+  remaining -= taxFreeDraw;
+
+  if (remaining > 0) {
+    next = { taxable: 0, taxDeferred: 0, taxFree: 0, cash: 0 };
+  }
+
+  return next;
 }
 
 function collegeCashFlow(age: number, events: CollegeEvent[], inflationRate: number, currentAge: number): number {
@@ -333,20 +373,13 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
   let ruinedPaths = 0;
   const startingAssets = getInvestableAssets(inputs);
 
-  // Constant proxies for the deferred/taxable asset mix.
-  // Used to estimate the tax character of portfolio withdrawals in retirement.
-  const totalInvestableForTax = Math.max(1, startingAssets);
-  const deferredFraction = inputs.taxDeferredAssets / totalInvestableForTax;
-  const taxableFraction = inputs.taxableAssets / totalInvestableForTax;
-
-  // Cash earns inflation rate (conservative floor, not equity return).
-  // cashFraction and investedFraction are constant proxies for the life
-  // of the simulation, consistent with how deferredFraction is handled.
-  const cashFraction = inputs.cashReserves / Math.max(1, startingAssets);
-  const investedFraction = 1 - cashFraction;
-
   for (let simulationIndex = 0; simulationIndex < inputs.numSimulations; simulationIndex += 1) {
-    let wealth = Math.max(0, startingAssets);
+    let buckets: PortfolioBuckets = {
+      taxable: Math.max(0, inputs.taxableAssets),
+      taxDeferred: Math.max(0, inputs.taxDeferredAssets),
+      taxFree: Math.max(0, inputs.taxFreeAssets),
+      cash: Math.max(0, inputs.cashReserves),
+    };
     let ruined = false;
     const path: number[] = [];
     const spendPath: number[] = [];
@@ -358,15 +391,10 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
       const stressed = stressReturn(baseReturn, inputs, yearIndex, stressScenario);
       const spending = getSpendingForAge(age, inputs.retirementAge, { ...inputs, inflationRate: stressed.inflationRate });
 
-      if (wealth <= 0) {
-        wealth = 0;
+      if (totalPortfolio(buckets) <= 0 && age >= inputs.retirementAge) {
+        buckets = { taxable: 0, taxDeferred: 0, taxFree: 0, cash: 0 };
       } else {
-        // Apply differentiated returns: cash earns inflation rate,
-        // invested assets earn the stochastic market return.
-        const blendedReturn =
-          cashFraction * stressed.inflationRate +
-          investedFraction * stressed.annualReturn;
-        wealth = Math.max(0, wealth * (1 + blendedReturn));
+        buckets = applyPortfolioReturns(buckets, stressed.annualReturn, stressed.inflationRate);
         
         // Calculate Gross Incomes
         let annualGrossIncome = salaryIncome(age, inputs.currentAge, inputs.retirementAge, inputs.annualSalary, inputs.inflationRate);
@@ -388,7 +416,7 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
         if (isRetired) {
           // In retirement: all after-tax income supplements the portfolio
           // (SS, pension, other income reduces portfolio withdrawals)
-          wealth += taxResult.afterTaxIncome;
+          buckets.cash += taxResult.afterTaxIncome;
         } else {
           // During accumulation:
           // 1. Pre-tax savings go directly to wealth pool (tax-deferred)
@@ -397,31 +425,21 @@ export function runSimulation(inputs: SimInputs, stressScenario?: StressScenario
           const trueAfterTaxTakeHome = Math.max(0, taxResult.afterTaxIncome - preTaxContributions);
           // 3. After-tax savings from actual take-home
           const afterTaxSaved = trueAfterTaxTakeHome * inputs.afterTaxSavingsRate;
-          wealth += preTaxContributions + afterTaxSaved;
+          buckets.taxDeferred += preTaxContributions;
+          buckets.taxable += afterTaxSaved;
         }
 
         const { netIncome: carryNetIncome, gpCommits: carryGPCommits } =
           carryAwardCashFlows(calendarYear, inputs.carryAwards, inputs);
-        wealth += carryNetIncome;
-        wealth -= carryGPCommits;
-        wealth += collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge);
-        if (wealth > 0) {
-          wealth -= age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
-          wealth -= yearIndex < inputs.mortgageYearsRemaining ? inputs.mortgageAnnualPayment : 0;
-        }
-        wealth -= spending;
-        // In retirement: apply tax on the net portfolio draw.
-        // Subtract carry income from the draw since it is already net of LTCG tax.
-        if (isRetired) {
-          const portfolioDraw = Math.max(
-            0,
-            spending - taxResult.afterTaxIncome - carryNetIncome
-          );
-          wealth -= estimateWithdrawalTax(portfolioDraw, deferredFraction, taxableFraction, inputs);
-        }
-        wealth = Math.max(0, wealth);
+        buckets.taxable += carryNetIncome;
+        const collegeNetOutflow = Math.abs(Math.min(0, collegeCashFlow(age, inputs.collegeEvents, inputs.inflationRate, inputs.currentAge)));
+        const capitalCalls = age < inputs.retirementAge ? inputs.capitalCallObligations : 0;
+        const mortgage = yearIndex < inputs.mortgageYearsRemaining ? inputs.mortgageAnnualPayment : 0;
+        const netOutflows = carryGPCommits + collegeNetOutflow + capitalCalls + mortgage + spending;
+        buckets = withdrawNetAmount(netOutflows, buckets, inputs);
       }
 
+      const wealth = totalPortfolio(buckets);
       if (!ruined && age >= inputs.retirementAge && wealth <= 0) ruined = true;
       path.push(wealth);
       spendPath.push(spending);

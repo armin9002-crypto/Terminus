@@ -21,41 +21,41 @@
 }
 
 :root[data-theme="light"] {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f8fafc;
-  --border: #cbd5e1;
-  --border-subtle: #e2e8f0;
-  --accent: #0d9488;
-  --accent-glow: rgba(13, 148, 136, 0.12);
-  --success: #16a34a;
-  --warning: #b45309;
-  --danger: #dc2626;
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #475569;
-  --scrollbar-thumb: #cbd5e1;
-  --noise-opacity: 0.02;
+  --bg-primary: #0b1220;
+  --bg-secondary: #111827;
+  --bg-card: #182235;
+  --bg-card-hover: #22304a;
+  --border: #3b4a61;
+  --border-subtle: #243246;
+  --accent: #2dd4bf;
+  --accent-glow: rgba(45, 212, 191, 0.18);
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --text-primary: #f8fafc;
+  --text-secondary: #dbeafe;
+  --text-muted: #9fb3c8;
+  --scrollbar-thumb: #3b4a61;
+  --noise-opacity: 0.03;
 }
 
 :root[data-theme="sepia"] {
-  --bg-primary: #1c1510;
-  --bg-secondary: #241d16;
-  --bg-card: #2e2318;
-  --bg-card-hover: #38291e;
-  --border: #5a4535;
-  --border-subtle: #3a2d22;
-  --accent: #e8a87c;
-  --accent-glow: rgba(232, 168, 124, 0.15);
-  --success: #8fc972;
-  --warning: #f0b840;
-  --danger: #e05555;
-  --text-primary: #f5e6d3;
-  --text-secondary: #d4b896;
-  --text-muted: #8a7260;
-  --scrollbar-thumb: #4a3728;
-  --noise-opacity: 0.04;
+  --bg-primary: #101015;
+  --bg-secondary: #181922;
+  --bg-card: #202330;
+  --bg-card-hover: #2a2d3d;
+  --border: #424657;
+  --border-subtle: #2b2f3d;
+  --accent: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.16);
+  --success: #34d399;
+  --warning: #facc15;
+  --danger: #f87171;
+  --text-primary: #f8fafc;
+  --text-secondary: #d1d5db;
+  --text-muted: #a1a9b8;
+  --scrollbar-thumb: #424657;
+  --noise-opacity: 0.03;
 }
 
 @tailwind base;
@@ -119,33 +119,33 @@ input[type="number"] {
 }
 
 :root[data-theme="light"] .recharts-cartesian-grid line {
-  stroke: #cbd5e1;
+  stroke: #3b4a61;
 }
 :root[data-theme="light"] .recharts-text {
-  fill: #475569;
+  fill: #9fb3c8;
 }
 :root[data-theme="light"] .recharts-tooltip-wrapper .recharts-default-tooltip {
-  background: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
+  background: #182235 !important;
+  border-color: #3b4a61 !important;
+  color: #f8fafc !important;
 }
 :root[data-theme="sepia"] .recharts-cartesian-grid line {
-  stroke: #5a4535;
+  stroke: #424657;
 }
 :root[data-theme="sepia"] .recharts-text {
-  fill: #a08060;
+  fill: #a1a9b8;
 }
 
 :root[data-theme="light"] .animate-pulse [class*="bg-slate-7"] {
-  background-color: #e2e8f0 !important;
+  background-color: #253247 !important;
 }
 :root[data-theme="sepia"] .animate-pulse [class*="bg-slate-7"] {
-  background-color: #4a3728 !important;
+  background-color: #2a2d3d !important;
 }
 
 :root[data-theme="light"] .animate-pulse [class*="bg-slate-7"] {
-  background-color: #e2e8f0 !important;
+  background-color: #253247 !important;
 }
 :root[data-theme="sepia"] .animate-pulse [class*="bg-slate-7"] {
-  background-color: #4a3728 !important;
+  background-color: #2a2d3d !important;
 }

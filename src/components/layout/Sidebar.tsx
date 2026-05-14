@@ -1,8 +1,9 @@
-import { Trash2, Plus } from "lucide-react";
+import { Info, Trash2, Plus } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../../components/ui/accordion";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { AgeInput } from "../../components/inputs/AgeInput";
 import { CurrencyInput } from "../../components/inputs/CurrencyInput";
 import { SliderInput } from "../../components/inputs/SliderInput";
@@ -14,7 +15,37 @@ import type { CarryAward } from "../../types";
 import { AnimatedNumber } from "../../components/ui/AnimatedNumber";
 
 function Chip({ children }: { children: React.ReactNode }) {
-  return <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-muted)]">{children}</span>;
+  return <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)]">{children}</span>;
+}
+
+function HelpTip({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex size-5 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Info size={12} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[260px] rounded-md border border-[var(--border)] bg-[#1e293b] p-3 text-xs leading-relaxed text-[var(--text-primary)] shadow-xl">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SectionTrigger({ title, summary, help }: { title: string; summary: string; help?: string }) {
+  return (
+    <span className="flex w-full items-center justify-between gap-2">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-left">{title}</span>
+        {help ? <HelpTip text={help} /> : null}
+      </span>
+      <Chip>{summary}</Chip>
+    </span>
+  );
 }
 
 export function Sidebar({ mobile = false }: { mobile?: boolean }) {
@@ -31,13 +62,16 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const gross = investable + inputs.illiquidAssets;
   const liquidPct = gross > 0 ? (investable / gross) * 100 : 0;
   const spendingDefaults = calculateSmartSpendingDefaults(inputs);
+  const combinedIncome = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
+  const carryEffective = inputs.carryAwards.reduce((sum, award) => sum + award.totalPoolValue * award.poolValueCapture * award.vestedPercent, 0);
+  const totalCollegeNeed = inputs.collegeEvents.reduce((sum, event) => sum + Math.max(0, event.annualCost * event.years - event.existingSavings529), 0);
 
   return (
     <aside className={`${mobile ? "max-h-[85vh]" : "h-[calc(100vh-56px)] lg:sticky lg:top-[56px]"} sidebar-scroll flex flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)]`}>
       <div className="flex-1 overflow-y-auto p-3 pb-20">
         <Accordion type="multiple" defaultValue={["you", "assets"]} className="grid gap-2">
           <AccordionItem value="you" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
-            <AccordionTrigger>You & Your Spouse <Chip>Retire {inputs.retirementAge}</Chip></AccordionTrigger>
+            <AccordionTrigger><SectionTrigger title="You & Your Spouse" summary={`${inputs.currentAge} -> ${inputs.retirementAge} / ${inputs.planningAge}`} /></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <div className="grid grid-cols-2 gap-2">
                 <AgeInput label="Your age" value={inputs.currentAge} min={30} max={70} error={errors.currentAge} onChange={(value) => setInput("currentAge", value)} />
@@ -58,7 +92,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           </AccordionItem>
 
           <AccordionItem value="assets" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
-            <AccordionTrigger>Your Assets <Chip>{formatCompactCurrency(investable)} liquid</Chip></AccordionTrigger>
+            <AccordionTrigger><SectionTrigger title="Your Assets" summary={`${formatCompactCurrency(investable)} investable`} /></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <CurrencyInput label="Taxable brokerage" value={inputs.taxableAssets} max={20_000_000} step={25_000} error={errors.taxableAssets} onChange={(value) => setInput("taxableAssets", value)} />
               <CurrencyInput label="Traditional 401k / IRA" value={inputs.taxDeferredAssets} max={10_000_000} step={25_000} error={errors.taxDeferredAssets} onChange={(value) => setInput("taxDeferredAssets", value)} />
@@ -80,14 +114,17 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 
           <AccordionItem value="spending" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
-              Spending Plan
-              <Chip>{formatCompactCurrency(inputs.spendingGoGo)}/yr</Chip>
+              <SectionTrigger
+                title="Spending Plan"
+                summary={`${formatCompactCurrency(inputs.spendingGoGo)}/yr`}
+                help="Spending is entered in today's dollars. During retirement, Terminus inflates each year's target and follows the go-go, slow-go, and no-go spending smile."
+              />
             </AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <div className="flex items-center justify-between rounded border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1.5">
                 <span className="text-[10px] text-[var(--text-muted)]">
                   Suggested: <span className="font-bold text-[var(--text-primary)]">{formatCompactCurrency(spendingDefaults.goGo)}/yr</span>
-                  <span className="ml-1 opacity-60">({spendingDefaults.basis})</span>
+                  <span className="ml-1 opacity-60">({spendingDefaults.basis}; Apply uses the 85% Monte Carlo solver when stable)</span>
                 </span>
                 <button
                   onClick={applySmartSpendingDefaults}
@@ -154,7 +191,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           </AccordionItem>
 
           <AccordionItem value="market" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
-            <AccordionTrigger>Market <Chip>{(inputs.expectedReturn * 100).toFixed(1)}% Return</Chip></AccordionTrigger>
+            <AccordionTrigger><SectionTrigger title="Market" summary={`${(inputs.expectedReturn * 100).toFixed(1)}% / ${(inputs.volatility * 100).toFixed(0)}% vol`} /></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <SliderInput label="Expected Return" value={inputs.expectedReturn} min={0.01} max={0.15} step={0.005} format="percent" error={errors.expectedReturn} onChange={(v) => setInput("expectedReturn", v)} />
               <SliderInput label="Volatility" value={inputs.volatility} min={0.01} max={0.3} step={0.01} format="percent" error={errors.volatility} onChange={(v) => setInput("volatility", v)} />
@@ -163,8 +200,11 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 
           <AccordionItem value="income" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
-              Income & Social Security
-              <Chip>SS {inputs.socialSecurityAge}</Chip>
+              <SectionTrigger
+                title="Income & Social Security"
+                summary={`${formatCompactCurrency(combinedIncome)}/yr | SS ${inputs.socialSecurityAge}`}
+                help="Social Security starts only after retirement and only after each spouse reaches their own claiming age. Benefits are adjusted for claiming age and haircut for trust-fund uncertainty."
+              />
             </AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <CurrencyInput label="Your annual salary (pre-retirement)" value={inputs.annualSalary} max={2000000} step={25000} error={errors.annualSalary} onChange={(v) => setInput('annualSalary', v)} />
@@ -185,10 +225,11 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 
           <AccordionItem value="tax" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
-              Tax & Savings
-              <Chip>
-                {(inputs.stateIncomeTaxRate * 100).toFixed(0)}% state
-              </Chip>
+              <SectionTrigger
+                title="Tax & Savings"
+                summary={`${(inputs.stateIncomeTaxRate * 100).toFixed(1)}% state | ${((inputs.preTaxSavingsRate + inputs.afterTaxSavingsRate) * 100).toFixed(0)}% save`}
+                help="Working years use federal brackets, FICA, state tax, and savings rates. Retirement withdrawals now come from actual buckets: cash, taxable, tax-deferred, then Roth/tax-free."
+              />
             </AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <div className="grid gap-2">
@@ -256,17 +297,11 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 
           <AccordionItem value="carry" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>
-              Carry Awards
-              <Chip>
-                {inputs.carryAwards.length === 0
-                  ? "0 awards"
-                  : `${inputs.carryAwards.length} award${inputs.carryAwards.length > 1 ? "s" : ""} | ${formatCompactCurrency(
-                      inputs.carryAwards.reduce(
-                        (sum, a) => sum + a.totalPoolValue * a.poolValueCapture * a.vestedPercent,
-                        0
-                      )
-                    )} effective`}
-              </Chip>
+              <SectionTrigger
+                title="Carry Awards"
+                summary={inputs.carryAwards.length === 0 ? "0 awards" : `${inputs.carryAwards.length} | ${formatCompactCurrency(carryEffective)} effective`}
+                help="Carry is modeled as net after-tax distributions over a 12-year fund curve, offset by GP commit outflows in the first three fund years."
+              />
             </AccordionTrigger>
             <AccordionContent className="grid gap-2">
               {errors.carryAwards && <p className="text-[10px] text-[var(--danger)]">{errors.carryAwards}</p>}
@@ -394,7 +429,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           </AccordionItem>
 
           <AccordionItem value="liabilities" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
-            <AccordionTrigger>Liabilities & Obligations <Chip>{formatCompactCurrency(inputs.mortgageBalance)}</Chip></AccordionTrigger>
+            <AccordionTrigger><SectionTrigger title="Liabilities & Obligations" summary={`${formatCompactCurrency(inputs.mortgageBalance)} mortgage`} /></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <CurrencyInput label="Mortgage balance" value={inputs.mortgageBalance} max={3000000} error={errors.mortgageBalance} onChange={(v) => setInput('mortgageBalance', v)} />
               <CurrencyInput label="Annual mortgage payment" value={inputs.mortgageAnnualPayment} max={250000} step={5000} error={errors.mortgageAnnualPayment} onChange={(v) => setInput('mortgageAnnualPayment', v)} />
@@ -404,7 +439,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           </AccordionItem>
 
           <AccordionItem value="college" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
-            <AccordionTrigger>College & Kids <Chip>{inputs.collegeEvents.length} kids</Chip></AccordionTrigger>
+            <AccordionTrigger><SectionTrigger title="College & Kids" summary={`${inputs.collegeEvents.length} kids | ${formatCompactCurrency(totalCollegeNeed)}`} /></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <p className="text-[11px] text-[var(--text-muted)]">College costs modeled as annual withdrawals net of 529 savings.</p>
               {errors.collegeEvents && <p className="text-[10px] text-[var(--danger)]">{errors.collegeEvents}</p>}

@@ -35,17 +35,17 @@ export function WithdrawalRateChart() {
     if (age >= inputs.socialSecurityAge) {
       ss += inputs.socialSecurityAmount * getSsFactor(inputs.socialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.socialSecurityAge));
     }
-    if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
-      ss += inputs.spouseSocialSecurityAmount * getSsFactor(inputs.spouseSocialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.spouseSocialSecurityAge));
+    const spouseAge = age - (inputs.currentAge - inputs.spouseCurrentAge);
+    if (inputs.hasSpouse && spouseAge >= inputs.spouseSocialSecurityAge) {
+      ss += inputs.spouseSocialSecurityAmount * getSsFactor(inputs.spouseSocialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, spouseAge - inputs.spouseSocialSecurityAge));
     }
-    const other = inputs.otherRetirementIncome > 0 ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge) : 0;
+    const other = age >= inputs.retirementAge && inputs.otherRetirementIncome > 0 ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge) : 0;
     return (ss + other) * 0.80;
   }
 
   const data: WRPoint[] = results.percentilePaths
-    .filter(p => p.age >= inputs.retirementAge)
     .map((p, i) => {
-      const spendIdx = inputs.retirementAge - inputs.currentAge + i;
+      const spendIdx = i;
       const spending = results.yearlyMedianSpend[spendIdx] ?? 0;
       const np = nonPortfolio(p.age);
       const netDraw = Math.max(0, spending - np);
