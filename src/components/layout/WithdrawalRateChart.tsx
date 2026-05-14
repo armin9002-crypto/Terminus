@@ -1,11 +1,10 @@
 import {
-  Area, CartesianGrid, ComposedChart, Line, ReferenceLine,
-  ResponsiveContainer, Tooltip, XAxis, YAxis
+  Area, CartesianGrid, ComposedChart, Line,
+  ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis
 } from "recharts";
 import { useSimStore } from "../../store/useSimStore";
-import { formatPercentage } from "../../lib/formatters";
 
-interface WithdrawalRatePoint {
+interface WRPoint {
   age: number;
   rateP10: number;
   rateP50: number;
@@ -14,24 +13,24 @@ interface WithdrawalRatePoint {
 }
 
 export function WithdrawalRateChart() {
-  const inputs = useSimStore((state) => state.inputs);
-  const results = useSimStore((state) => state.results);
-  const isRunning = useSimStore((state) => state.isRunning);
+  const inputs = useSimStore((s) => s.inputs);
+  const results = useSimStore((s) => s.results);
+  const isRunning = useSimStore((s) => s.isRunning);
 
   if (isRunning || !results) {
     return <div className="h-[360px] animate-pulse rounded-lg bg-[var(--border)]" />;
   }
 
-  // Estimate annual non-portfolio income (SS + other, simplified)
-  function estimateNonPortfolioIncome(age: number): number {
-    const SS_HAIRCUT = 0.85;
-    const SS_FRA = 67;
-    function getSsFactor(a: number) {
-      if (a <= 62) return 0.70;
-      if (a >= 70) return 1.24;
-      if (a < SS_FRA) { const e = SS_FRA - a; return e <= 3 ? 1 - e * 0.0667 : 1 - 3 * 0.0667 - (e - 3) * 0.05; }
-      return 1 + (a - SS_FRA) * 0.08;
-    }
+  const SS_HAIRCUT = 0.85;
+  const SS_FRA = 67;
+  function getSsFactor(a: number): number {
+    if (a <= 62) return 0.70;
+    if (a >= 70) return 1.24;
+    if (a < SS_FRA) { const e = SS_FRA - a; return e <= 3 ? 1 - e * 0.0667 : 1 - 3 * 0.0667 - (e - 3) * 0.05; }
+    return 1 + (a - SS_FRA) * 0.08;
+  }
+
+  function nonPortfolio(age: number): number {
     let ss = 0;
     if (age >= inputs.socialSecurityAge) {
       ss += inputs.socialSecurityAmount * getSsFactor(inputs.socialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.socialSecurityAge));
@@ -39,40 +38,32 @@ export function WithdrawalRateChart() {
     if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
       ss += inputs.spouseSocialSecurityAmount * getSsFactor(inputs.spouseSocialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.spouseSocialSecurityAge));
     }
-    const other = inputs.otherRetirementIncome > 0
-      ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge)
-      : 0;
-    return ss + other;
+    const other = inputs.otherRetirementIncome > 0 ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge) : 0;
+    return (ss + other) * 0.80;
   }
 
-  const data: WithdrawalRatePoint[] = results.percentilePaths
+  const data: WRPoint[] = results.percentilePaths
     .filter(p => p.age >= inputs.retirementAge)
     .map((p, i) => {
-      const spending = results.yearlyMedianSpend[inputs.retirementAge - inputs.currentAge + i] ?? 0;
-      const nonPortfolio = estimateNonPortfolioIncome(p.age);
-      const netDraw = Math.max(0, spending - nonPortfolio);
-      const rateP10 = p.p10 > 0 ? (netDraw / p.p10) : 0;
-      const rateP50 = p.p50 > 0 ? (netDraw / p.p50) : 0;
-      const rateP90 = p.p90 > 0 ? (netDraw / p.p90) : 0;
-      return {
-        age: p.age,
-        rateP10: Math.min(rateP10, 0.30),
-        rateP50: Math.min(rateP50, 0.30),
-        rateP90: Math.min(rateP90, 0.30),
-        band: [Math.min(rateP90, 0.30), Math.min(rateP10, 0.30)] as [number, number],
-      };
+      const spendIdx = inputs.retirementAge - inputs.currentAge + i;
+      const spending = results.yearlyMedianSpend[spendIdx] ?? 0;
+      const np = nonPortfolio(p.age);
+      const netDraw = Math.max(0, spending - np);
+      const r10 = p.p10 > 0 ? Math.min(netDraw / p.p10, 0.30) : 0;
+      const r50 = p.p50 > 0 ? Math.min(netDraw / p.p50, 0.30) : 0;
+      const r90 = p.p90 > 0 ? Math.min(netDraw / p.p90, 0.30) : 0;
+      return { age: p.age, rateP10: r10, rateP50: r50, rateP90: r90, band: [r90, r10] as [number, number] };
     });
 
   const firstDangerAge = data.find(d => d.rateP50 > 0.05)?.age;
-  const firstUnsafeAge = data.find(d => d.rateP10 > 0.08)?.age;
 
   return (
     <div className="grid gap-4">
       <div>
         <p className="text-sm font-bold text-[var(--text-primary)]">Portfolio Withdrawal Rate Over Time</p>
         <p className="text-xs text-[var(--text-muted)] mt-0.5">
-          Net portfolio draw as a percentage of portfolio value at each age.
-          Below 4% is considered safe; above 6-8% in bad scenarios is a warning sign.
+          Net portfolio draw as a percentage of portfolio value at each age, across percentiles.
+          Below 4% is considered safe; above 8% in bad scenarios is a warning sign.
           {firstDangerAge && ` Median rate exceeds 5% starting around age ${firstDangerAge}.`}
         </p>
       </div>
@@ -105,7 +96,8 @@ export function WithdrawalRateChart() {
       </div>
 
       <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-3 text-xs text-[var(--text-secondary)]">
-        <strong className="text-[var(--text-primary)]">How to read this:</strong> In a good scenario (green, 90th percentile wealth), your large portfolio means a small withdrawal rate even on significant spending. In a bad scenario (red, 10th percentile), a depleted portfolio requires a high withdrawal rate to maintain spending -- eventually unsustainable. When the red line exceeds 8%, those paths are approaching ruin. The 4% green reference line represents the conventional "safe withdrawal rate" from financial planning research.
+        <strong className="text-[var(--text-primary)]">How to read this: </strong>
+        In a good scenario (green, 90th percentile wealth), the large portfolio means a small withdrawal rate. In a bad scenario (red, 10th percentile), a depleted portfolio requires a high rate to maintain spending -- eventually unsustainable. When the red line exceeds 8%, those paths are approaching ruin. The 4% green reference line represents the conventional safe withdrawal rate from financial planning research.
       </div>
     </div>
   );

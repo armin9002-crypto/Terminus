@@ -16,52 +16,44 @@ interface WaterfallYear {
   totalSpending: number;
 }
 
-function computeWaterfallData(inputs: SimInputs): WaterfallYear[] {
+function getSsFactor(claimAge: number): number {
   const SS_FRA = 67;
+  if (claimAge <= 62) return 0.70;
+  if (claimAge >= 70) return 1.24;
+  if (claimAge < SS_FRA) {
+    const e = SS_FRA - claimAge;
+    return e <= 3 ? 1 - e * 0.0667 : 1 - 3 * 0.0667 - (e - 3) * 0.05;
+  }
+  return 1 + (claimAge - SS_FRA) * 0.08;
+}
+
+function computeWaterfallData(inputs: SimInputs): WaterfallYear[] {
   const SS_HAIRCUT = 0.85;
   const LTCG_RATE = Math.min(0.20 + 0.038 + inputs.stateIncomeTaxRate, 0.55);
   const ORD_RATE = 0.22 + inputs.stateIncomeTaxRate;
-
-  function getSsFactor(age: number): number {
-    if (age <= 62) return 0.70;
-    if (age >= 70) return 1.24;
-    if (age < SS_FRA) {
-      const yearsEarly = SS_FRA - age;
-      return yearsEarly <= 3 ? 1 - yearsEarly * 0.0667 : 1 - 3 * 0.0667 - (yearsEarly - 3) * 0.05;
-    }
-    return 1 + (age - SS_FRA) * 0.08;
-  }
-
-  function getSpending(age: number): number {
-    const idx = age - inputs.retirementAge;
-    const inf = Math.pow(1 + inputs.inflationRate, idx);
-    if (idx < inputs.goGoYears) return inputs.spendingGoGo * inf;
-    if (idx < inputs.goGoYears + inputs.slowGoYears) return inputs.spendingSlowGo * inf;
-    return (inputs.spendingNoGo + inputs.healthcareSurgeAmount) * inf;
-  }
 
   const result: WaterfallYear[] = [];
 
   for (let age = inputs.retirementAge; age <= inputs.planningAge; age++) {
     const calYear = inputs.simulationStartYear + (age - inputs.currentAge);
-    const spending = getSpending(age);
+    const ri = age - inputs.retirementAge;
+    const inf = Math.pow(1 + inputs.inflationRate, ri);
+    let spending: number;
+    if (ri < inputs.goGoYears) spending = inputs.spendingGoGo * inf;
+    else if (ri < inputs.goGoYears + inputs.slowGoYears) spending = inputs.spendingSlowGo * inf;
+    else spending = (inputs.spendingNoGo + inputs.healthcareSurgeAmount) * inf;
 
-    // SS income (gross, COLA-adjusted from claiming age)
     let ssGross = 0;
     if (age >= inputs.socialSecurityAge) {
-      const factor = getSsFactor(inputs.socialSecurityAge);
-      const yearsInflated = Math.max(0, age - inputs.socialSecurityAge);
-      ssGross += inputs.socialSecurityAmount * factor * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, yearsInflated);
+      const yInf = Math.max(0, age - inputs.socialSecurityAge);
+      ssGross += inputs.socialSecurityAmount * getSsFactor(inputs.socialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, yInf);
     }
     if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
-      const factor = getSsFactor(inputs.spouseSocialSecurityAge);
-      const yearsInflated = Math.max(0, age - inputs.spouseSocialSecurityAge);
-      ssGross += inputs.spouseSocialSecurityAmount * factor * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, yearsInflated);
+      const yInf = Math.max(0, age - inputs.spouseSocialSecurityAge);
+      ssGross += inputs.spouseSocialSecurityAmount * getSsFactor(inputs.spouseSocialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, yInf);
     }
-    // Apply rough SS tax (up to 85% taxable at ordinary rates)
-    const ssAfterTax = ssGross * (1 - Math.min(0.85, 1) * ORD_RATE * 0.6);
+    const ssAfterTax = ssGross * (1 - 0.85 * ORD_RATE * 0.6);
 
-    // Carry net income for this calendar year
     let carryNet = 0;
     for (const award of inputs.carryAwards) {
       const fundYear = calYear - award.vintageYear + 1;
@@ -74,9 +66,8 @@ function computeWaterfallData(inputs: SimInputs): WaterfallYear[] {
       }
     }
 
-    // Other retirement income (after rough tax)
     const otherGross = inputs.otherRetirementIncome > 0
-      ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge)
+      ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, ri)
       : 0;
     const otherAfterTax = otherGross * (1 - ORD_RATE);
 
@@ -92,27 +83,29 @@ function computeWaterfallData(inputs: SimInputs): WaterfallYear[] {
       totalSpending: Math.round(spending),
     });
   }
-
   return result;
 }
 
 export function RetirementIncomeWaterfallChart() {
-  const inputs = useSimStore((state) => state.inputs);
+  const inputs = useSimStore((s) => s.inputs);
   const data = computeWaterfallData(inputs);
 
-  // Decimate to every other year for readability if horizon > 25 years
   const horizon = inputs.planningAge - inputs.retirementAge;
   const displayData = horizon > 25 ? data.filter((_, i) => i % 2 === 0) : data;
-
-  const portfolioDependent = data.map(d => d.portfolioDraw / Math.max(1, d.totalSpending));
   const firstMajorDrawYear = data.find(d => d.portfolioDraw / Math.max(1, d.totalSpending) > 0.5);
+  const totalSS = data.reduce((s, d) => s + d.ssIncome, 0);
+  const totalCarry = data.reduce((s, d) => s + d.carryIncome, 0);
+  const totalDraw = data.reduce((s, d) => s + d.portfolioDraw, 0);
+  const totalSpend = data.reduce((s, d) => s + d.totalSpending, 0);
+  const depPct = totalSpend > 0 ? Math.round(totalDraw / totalSpend * 100) : 0;
 
   return (
     <div className="grid gap-4">
       <div>
         <p className="text-sm font-bold text-[var(--text-primary)]">Retirement Income Sources</p>
         <p className="text-xs text-[var(--text-muted)] mt-0.5">
-          How your annual spending is covered year-by-year: SS, carry, other income, and portfolio draw.
+          How annual spending is covered year-by-year. Stacked bars show SS (blue),
+          carry distributions (teal), other income (green), and portfolio draw (orange).
           {firstMajorDrawYear && ` Portfolio becomes the majority income source at age ${firstMajorDrawYear.age}.`}
         </p>
       </div>
@@ -129,7 +122,7 @@ export function RetirementIncomeWaterfallChart() {
               labelFormatter={(age) => `Age ${age}`}
             />
             <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 11 }} />
-            <Bar dataKey="ssIncome" name="Social Security (after tax)" stackId="a" fill="#38bdf8" fillOpacity={0.85} radius={[0, 0, 0, 0]} />
+            <Bar dataKey="ssIncome" name="Social Security (after tax)" stackId="a" fill="#38bdf8" fillOpacity={0.85} />
             <Bar dataKey="carryIncome" name="Carry Distributions (net)" stackId="a" fill="#14b8a6" fillOpacity={0.85} />
             <Bar dataKey="otherIncome" name="Other Income (after tax)" stackId="a" fill="#22c55e" fillOpacity={0.85} />
             <Bar dataKey="portfolioDraw" name="Portfolio Draw" stackId="a" fill="#f97316" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
@@ -141,11 +134,11 @@ export function RetirementIncomeWaterfallChart() {
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          { label: "Total SS (lifetime)", value: formatCompactCurrency(data.reduce((s, d) => s + d.ssIncome, 0)), color: "#38bdf8" },
-          { label: "Total Carry (lifetime)", value: formatCompactCurrency(data.reduce((s, d) => s + d.carryIncome, 0)), color: "#14b8a6" },
-          { label: "Total Portfolio Draw", value: formatCompactCurrency(data.reduce((s, d) => s + d.portfolioDraw, 0)), color: "#f97316" },
-          { label: "Portfolio Dependency", value: `${Math.round(data.reduce((s, d) => s + d.portfolioDraw, 0) / Math.max(1, data.reduce((s, d) => s + d.totalSpending, 0)) * 100)}% of spending`, color: "#94a3b8" },
-        ].map((m) => (
+          { label: "Total SS (lifetime)", value: formatCompactCurrency(totalSS), color: "#38bdf8" },
+          { label: "Total Carry (lifetime)", value: formatCompactCurrency(totalCarry), color: "#14b8a6" },
+          { label: "Total Portfolio Draw", value: formatCompactCurrency(totalDraw), color: "#f97316" },
+          { label: "Portfolio Dependency", value: `${depPct}% of spending`, color: "#94a3b8" },
+        ].map(m => (
           <div key={m.label} className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] p-2 text-center">
             <p className="text-sm font-bold tabular-nums" style={{ color: m.color }}>{m.value}</p>
             <p className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-widest">{m.label}</p>

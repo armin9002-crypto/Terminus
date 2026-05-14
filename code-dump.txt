@@ -972,7 +972,307 @@ export function WealthFanChart() {
 
 
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\dashboard\ExecutiveSummary.tsx
+import { useState, useEffect } from "react";
+import type { ReactNode } from "react";
+import { useSimStore } from "../../store/useSimStore";
+import { runSimulation, getInvestableAssets, getAccumulationSummary, solveSustainableSpend } from "../../engine/monteCarlo";
+import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
 
+function Metric({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: "success" | "warning" | "danger" | "accent" }) {
+  const colorClass = color === "success" ? "text-[var(--success)]"
+    : color === "warning" ? "text-[var(--warning)]"
+    : color === "danger" ? "text-[var(--danger)]"
+    : color === "accent" ? "text-[var(--accent)]"
+    : "text-[var(--text-primary)]";
+  return (
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-3 text-center">
+      <p className={`text-xl font-bold tabular-nums ${colorClass}`}>{value}</p>
+      {sub && <p className="text-[10px] text-[var(--accent)] mt-0.5">{sub}</p>}
+      <p className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-widest">{label}</p>
+    </div>
+  );
+}
+
+function SectionHeader({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)] mt-1 mb-1.5">
+      {children}
+    </p>
+  );
+}
+
+function Row({ label, value, indent }: { label: string; value: string; indent?: boolean }) {
+  return (
+    <div className={`flex justify-between items-baseline py-1 border-b border-[var(--border)] last:border-0 ${indent ? "pl-4" : ""}`}>
+      <span className="text-xs text-[var(--text-muted)]">{label}</span>
+      <span className="text-xs font-bold text-[var(--text-primary)] tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function NarrativeSection({ title, children, tone }: { title: string; children: string; tone?: "success" | "warning" | "danger" | "neutral" }) {
+  const barColor = tone === "success" ? "bg-[var(--success)]"
+    : tone === "warning" ? "bg-[var(--warning)]"
+    : tone === "danger" ? "bg-[var(--danger)]"
+    : "bg-[var(--accent)]";
+  return (
+    <div className="grid gap-1">
+      <div className="flex items-center gap-2">
+        <div className={`h-3 w-1 rounded-full ${barColor}`} />
+        <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{title}</p>
+      </div>
+      <p className="text-xs leading-relaxed text-[var(--text-secondary)] pl-3">{children}</p>
+    </div>
+  );
+}
+
+interface ComparativeResults {
+  noCarry: number;
+  retireEarlier: number;
+  retireLater: number;
+  sustainableSpend: number;
+  highSpend: number;
+  lowSpend: number;
+}
+
+export function ExecutiveSummary() {
+  const inputs = useSimStore((state) => state.inputs);
+  const results = useSimStore((state) => state.results);
+  const [comparative, setComparative] = useState<ComparativeResults | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const successRate = results?.successRate ?? 0;
+  const ruin = results?.ruinProbability ?? 0;
+  const medianTerminal = results?.medianTerminalWealth ?? 0;
+  const investable = getInvestableAssets(inputs);
+  const summary = results ? getAccumulationSummary(inputs) : null;
+
+  const totalCarryNet = inputs.carryAwards.reduce((sum, a) => {
+    const gross = a.totalPoolValue * a.poolValueCapture * a.vestedPercent;
+    const taxRate = Math.min(0.20 + 0.038 + inputs.stateIncomeTaxRate, 0.55);
+    return sum + gross * (1 - taxRate);
+  }, 0);
+
+  const totalGPCommit = inputs.carryAwards.reduce(
+    (sum, a) => sum + a.totalPoolValue * a.gpCommitPercent, 0
+  );
+
+  const combinedIncome = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
+  const p10Terminal = results?.percentilePaths[results.percentilePaths.length - 1]?.p10 ?? 0;
+  const p90Terminal = results?.percentilePaths[results.percentilePaths.length - 1]?.p90 ?? 0;
+
+  useEffect(() => {
+    if (!results) return;
+    setLoading(true);
+    const n = Math.min(inputs.numSimulations, 250);
+    setTimeout(() => {
+      const noCarryRate = runSimulation({ ...inputs, carryAwards: [], numSimulations: n }).successRate;
+      const earlierRate = runSimulation({ ...inputs, retirementAge: Math.max(inputs.currentAge + 1, inputs.retirementAge - 3), numSimulations: n }).successRate;
+      const laterRate = runSimulation({ ...inputs, retirementAge: Math.min(inputs.planningAge - 1, inputs.retirementAge + 3), numSimulations: n }).successRate;
+      const sustainSpend = solveSustainableSpend(inputs);
+      const highSpendRate = runSimulation({ ...inputs, spendingGoGo: inputs.spendingGoGo * 1.2, spendingSlowGo: inputs.spendingSlowGo * 1.2, spendingNoGo: inputs.spendingNoGo * 1.2, numSimulations: n }).successRate;
+      const lowSpendRate = runSimulation({ ...inputs, spendingGoGo: inputs.spendingGoGo * 0.8, spendingSlowGo: inputs.spendingSlowGo * 0.8, spendingNoGo: inputs.spendingNoGo * 0.8, numSimulations: n }).successRate;
+      setComparative({
+        noCarry: noCarryRate,
+        retireEarlier: earlierRate,
+        retireLater: laterRate,
+        sustainableSpend: sustainSpend,
+        highSpend: highSpendRate,
+        lowSpend: lowSpendRate,
+      });
+      setLoading(false);
+    }, 0);
+  }, [results?.successRate, inputs.retirementAge, inputs.spendingGoGo]);
+
+  if (!results) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-sm text-[var(--text-muted)]">Simulation not yet run.</p>
+      </div>
+    );
+  }
+
+  const verdictColor: "success" | "warning" | "danger" = successRate >= 0.85 ? "success" : successRate >= 0.70 ? "warning" : "danger";
+
+  const carryLift = comparative ? successRate - comparative.noCarry : null;
+  const workingLift = comparative ? comparative.retireLater - successRate : null;
+  const earlyPenalty = comparative ? successRate - comparative.retireEarlier : null;
+  const spendUpPenalty = comparative ? successRate - comparative.highSpend : null;
+  const spendDownGain = comparative ? comparative.lowSpend - successRate : null;
+
+  function overallVerdict(): string {
+    const retYears = inputs.retirementAge - inputs.currentAge;
+    const estAtRetirement = formatCompactCurrency(summary?.estimatedRetirementAssets ?? 0);
+    const ssDelay = inputs.socialSecurityAge - inputs.retirementAge;
+
+    if (successRate >= 0.90) {
+      return `This plan is strongly positioned. Across ${inputs.numSimulations.toLocaleString()} simulated futures, ${formatPercentage(successRate)} succeed through age ${inputs.planningAge} -- well above the 85% planning threshold. With ${formatCompactCurrency(investable)} investable today and ${retYears} years of additional compounding, projected assets at retirement of approximately ${estAtRetirement} provide a substantial margin of safety. Social Security claims at age ${inputs.socialSecurityAge}${ssDelay > 0 ? `, delayed ${ssDelay} years past retirement for maximum benefit` : ""} . The primary question is not whether the plan succeeds but how much wealth accumulates beyond what is needed.`;
+    }
+    if (successRate >= 0.80) {
+      return `This plan is on track with a ${formatPercentage(successRate)} success rate across ${inputs.numSimulations.toLocaleString()} simulated futures -- above the 85% planning threshold${successRate >= 0.85 ? "" : " though modestly below it"}. Projected assets of approximately ${estAtRetirement} at retirement provide a reasonable base. Several risk factors merit monitoring: the width of the outcome distribution is significant, with the 10th percentile terminal balance of ${formatCompactCurrency(p10Terminal)} representing a substantial shortfall from the median of ${formatCompactCurrency(medianTerminal)}.`;
+    }
+    return `This plan carries meaningful retirement risk. Only ${formatPercentage(successRate)} of simulated paths succeed through age ${inputs.planningAge}, below the conventional 85% planning threshold. The ${formatPercentage(ruin)} ruin probability means roughly 1 in ${Math.round(1 / ruin)} scenarios leads to portfolio depletion during retirement. In adverse scenarios (10th percentile), the terminal balance is ${formatCompactCurrency(p10Terminal)}, compared to a median of ${formatCompactCurrency(medianTerminal)}. The plan as currently structured requires either higher savings, lower spending, delayed retirement, or a combination of all three.`;
+  }
+
+  function accumulationSection(): string {
+    if (!summary) return "";
+    const retYears = inputs.retirementAge - inputs.currentAge;
+    const savingsRate = combinedIncome > 0 ? (summary.annualSavings / combinedIncome) * 100 : 0;
+    return `${retYears} years separate today from retirement at ${inputs.retirementAge}. At a combined gross income of ${formatCompactCurrency(combinedIncome)}/year and total savings rate of ${savingsRate.toFixed(0)}% (${formatCompactCurrency(summary.preTaxSavings)}/yr pre-tax + ${formatCompactCurrency(summary.afterTaxSavings)}/yr after-tax), projected investable assets at retirement are approximately ${formatCompactCurrency(summary.estimatedRetirementAssets)}, based on ${formatPercentage(inputs.expectedReturn, 1)} CAGR with ${formatPercentage(inputs.volatility, 0)} volatility. The asset mix today is ${formatPercentage(inputs.taxDeferredAssets / Math.max(1, investable), 0)} tax-deferred, ${formatPercentage(inputs.taxableAssets / Math.max(1, investable), 0)} taxable, and ${formatPercentage(inputs.taxFreeAssets / Math.max(1, investable), 0)} Roth. ${inputs.mortgageBalance > 0 ? `The ${formatCompactCurrency(inputs.mortgageBalance)} mortgage with ${inputs.mortgageYearsRemaining} years remaining reduces spendable income by ${formatCompactCurrency(inputs.mortgageAnnualPayment)}/year until payoff.` : "The portfolio carries no mortgage obligation."}`;
+  }
+
+  function spendingSection(): string {
+    const sustainMonthly = comparative ? formatCompactCurrency(comparative.sustainableSpend) : "--";
+    const sustainAnnual = comparative ? formatCompactCurrency(comparative.sustainableSpend * 12) : "--";
+    const targetVsSustain = comparative ? inputs.spendingGoGo - comparative.sustainableSpend * 12 : 0;
+    const rel = targetVsSustain > 0 ? `${formatCompactCurrency(targetVsSustain)}/year above` : `${formatCompactCurrency(Math.abs(targetVsSustain))}/year below`;
+    return `The 85%-confidence sustainable spend is ${sustainAnnual}/year (${sustainMonthly}/month), with current go-go spending of ${formatCompactCurrency(inputs.spendingGoGo)}/year sitting ${rel} that threshold. ${inputs.spendingGoGo > 0 && comparative ? `A 20% spending increase to ${formatCompactCurrency(inputs.spendingGoGo * 1.2)}/year reduces the success rate by ${formatPercentage(spendUpPenalty ?? 0, 1)} to ${formatPercentage(comparative.highSpend, 0)}. A 20% reduction to ${formatCompactCurrency(inputs.spendingGoGo * 0.8)}/year improves it by ${formatPercentage(spendDownGain ?? 0, 1)} to ${formatPercentage(comparative.lowSpend, 0)}.` : ""} At ${formatPercentage(inputs.inflationRate, 1)} inflation, the go-go spending target of ${formatCompactCurrency(inputs.spendingGoGo)} in today's dollars requires ${formatCompactCurrency(inputs.spendingGoGo * Math.pow(1 + inputs.inflationRate, inputs.retirementAge - inputs.currentAge))}/year in nominal terms at retirement.`;
+  }
+
+  function carrySection(): string {
+    if (inputs.carryAwards.length === 0) {
+      return "No carry awards are modeled. For PE professionals with meaningful carry, this is often the largest single lever in the retirement plan. Even modest carry materializing meaningfully changes the outcome distribution.";
+    }
+    const carryLiftStr = carryLift !== null ? formatPercentage(Math.abs(carryLift), 1) : "--";
+    const netCarryVsSpending = totalCarryNet > 0 ? (totalCarryNet / (inputs.spendingGoGo * (inputs.goGoYears + inputs.slowGoYears))).toFixed(1) : "0";
+    const firstAwardVintage = Math.min(...inputs.carryAwards.map(a => a.vintageYear));
+    const lastAwardPeak = Math.max(...inputs.carryAwards.map(a => a.vintageYear + 8));
+    return `${inputs.carryAwards.length} carry award${inputs.carryAwards.length > 1 ? "s" : ""} contribute ${formatCompactCurrency(totalCarryNet)} in net after-tax distributions, offset by ${formatCompactCurrency(totalGPCommit)} in GP commit obligations. Peak distributions are projected ${firstAwardVintage + 6}-${lastAwardPeak}. ${carryLift !== null ? `Removing carry entirely reduces the success rate by ${carryLiftStr} to ${formatPercentage(comparative!.noCarry, 0)}, making carry responsible for approximately ${carryLiftStr} of the plan's current confidence margin.` : ""} Net carry of ${formatCompactCurrency(totalCarryNet)} represents approximately ${netCarryVsSpending}x the combined go-go and slow-go spending budget, providing a meaningful cushion if distributions materialize as modeled. The primary carry risk is capture rate uncertainty -- the Pool Value Capture inputs reflect your conservatism discount, but actual exits depend heavily on exit environment and fund performance.`;
+  }
+
+  function retirementTimingSection(): string {
+    if (!comparative) return "Run analysis to compute retirement timing sensitivity.";
+    const laterStr = `Working ${3} additional years to age ${Math.min(inputs.planningAge - 1, inputs.retirementAge + 3)} improves the success rate by ${formatPercentage(Math.abs(workingLift ?? 0), 1)} to ${formatPercentage(comparative.retireLater, 0)}.`;
+    const earlierStr = `Retiring ${3} years earlier at age ${Math.max(inputs.currentAge + 1, inputs.retirementAge - 3)} reduces the success rate by ${formatPercentage(Math.abs(earlyPenalty ?? 0), 1)} to ${formatPercentage(comparative.retireEarlier, 0)}.`;
+    const ssStr = `Social Security is claimed at ${inputs.socialSecurityAge}. ${inputs.socialSecurityAge < 67 ? `Delaying to the Full Retirement Age of 67 would increase your benefit by approximately ${formatPercentage((67 - inputs.socialSecurityAge) * 0.0667, 0)}, adding roughly ${formatCompactCurrency((67 - inputs.socialSecurityAge) * 0.0667 * inputs.socialSecurityAmount)}/year to retirement income.` : inputs.socialSecurityAge === 67 ? `Claiming at FRA maximizes the balance between lifetime total and monthly benefit.` : `Claiming past FRA captures delayed credits of 8%/year, maximizing the monthly benefit.`}`;
+    return `${laterStr} ${earlierStr} ${ssStr} Each additional working year simultaneously adds to the asset base, reduces the retirement horizon by one year, and defers the onset of portfolio withdrawals.`;
+  }
+
+  function riskSection(): string {
+    const p10AtRetire = results?.percentilePaths.find(p => p.age === inputs.retirementAge)?.p10 ?? 0;
+    const p50AtRetire = results?.percentilePaths.find(p => p.age === inputs.retirementAge)?.p50 ?? 0;
+    const sequenceStr = p50AtRetire > 0 && p10AtRetire / p50AtRetire < 0.75
+      ? `In the worst-decile paths at retirement, the portfolio is already at ${formatPercentage(p10AtRetire / p50AtRetire, 0)} of the median -- sequence-of-returns risk is material. A 2-3 year cash reserve at retirement would allow the portfolio time to recover from an early drawdown without forcing sales at depressed prices.`
+      : "The spread between 10th and 50th percentile wealth at retirement is within a manageable range, suggesting moderate sequence-of-returns exposure.";
+    const taxStr = inputs.taxDeferredAssets > 1_000_000
+      ? `The ${formatCompactCurrency(inputs.taxDeferredAssets)} tax-deferred balance will generate substantial RMDs after age 73. RMDs stacked with Social Security can push distributions into the 24-32% bracket -- materially above the 22% assumed in this model. A Roth conversion strategy in the window between retirement and SS claiming could reduce this burden.`
+      : "Tax-deferred balances are manageable relative to expected retirement income, limiting near-term RMD exposure.";
+    return `${sequenceStr} ${taxStr} Inflation is modeled at ${formatPercentage(inputs.inflationRate, 1)} -- a persistent overshoot to 4% would erode purchasing power by an additional ${formatPercentage(Math.pow(1.04 / (1 + inputs.inflationRate), inputs.planningAge - inputs.retirementAge) - 1, 0)} over the retirement horizon.`;
+  }
+
+  function sensitivitySection(): string {
+    if (!comparative) return "Computing sensitivity...";
+    const findings: string[] = [];
+    if (spendUpPenalty !== null && Math.abs(spendUpPenalty) > 0.03)
+      findings.push(`spending (a 20% increase costs ${formatPercentage(Math.abs(spendUpPenalty), 1)} in success rate)`);
+    if (carryLift !== null && Math.abs(carryLift) > 0.04)
+      findings.push(`carry realization (removing carry entirely costs ${formatPercentage(Math.abs(carryLift), 1)})`);
+    if (workingLift !== null && Math.abs(workingLift) > 0.03)
+      findings.push(`retirement timing (3 additional years gains ${formatPercentage(Math.abs(workingLift), 1)})`);
+    if (findings.length === 0)
+      findings.push("spending level", "market return assumptions", "retirement age");
+    return `The plan is most sensitive to: ${findings.join(", ")}. The single largest controllable lever is spending -- every dollar reduction in annual retirement spending directly extends the portfolio's runway. Market return assumptions (currently ${formatPercentage(inputs.expectedReturn, 1)} CAGR) drive the widening outcome distribution: at ${formatPercentage(inputs.volatility, 0)} volatility, the 10th-to-90th percentile range at age ${inputs.planningAge} spans ${formatCompactCurrency(p90Terminal - p10Terminal)}, illustrating how wide the range of possible futures is even with median inputs.`;
+  }
+
+  const narrativeSections = [
+    { title: "Overall Assessment", content: overallVerdict(), tone: verdictColor },
+    { title: "Accumulation Phase", content: accumulationSection(), tone: "neutral" as const },
+    { title: "Spending Plan", content: spendingSection(), tone: (inputs.spendingGoGo > (comparative?.sustainableSpend ?? 0) * 12 ? "warning" : "success") as "success" | "warning" | "danger" | "neutral" },
+    { title: "PE Carry Analysis", content: carrySection(), tone: inputs.carryAwards.length > 0 ? "success" as const : "neutral" as const },
+    { title: "Retirement Timing", content: retirementTimingSection(), tone: "neutral" as const },
+    { title: "Key Risks", content: riskSection(), tone: successRate < 0.85 ? "danger" as const : "warning" as const },
+    { title: "Sensitivity", content: sensitivitySection(), tone: "neutral" as const },
+  ];
+
+  return (
+    <div className="grid gap-6 max-w-3xl">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Executive Summary</p>
+          <h2 className="mt-1 text-sm font-bold text-[var(--text-primary)]">
+            Retirement Plan Analysis -- Age {inputs.currentAge} retiring at {inputs.retirementAge}
+          </h2>
+        </div>
+        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest ${
+          verdictColor === "success" ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20"
+          : verdictColor === "warning" ? "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20"
+          : "bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/20"
+        }`}>
+          {successRate >= 0.85 ? "On Track" : successRate >= 0.70 ? "At Risk" : "Needs Attention"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Metric label="Success Rate" value={formatPercentage(successRate, 1)} color={verdictColor} />
+        <Metric label="Ruin Probability" value={formatPercentage(ruin, 1)} color={ruin > 0.2 ? "danger" : ruin > 0.1 ? "warning" : "success"} />
+        <Metric label="Median Terminal" value={formatCompactCurrency(medianTerminal)} />
+        <Metric label="Safe Monthly Spend" value={comparative ? formatCompactCurrency(comparative.sustainableSpend) : "--"} sub="at 85% confidence" color="accent" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Metric label="10th Pct Terminal" value={formatCompactCurrency(p10Terminal)} color={p10Terminal < 0 ? "danger" : undefined} />
+        <Metric label="90th Pct Terminal" value={formatCompactCurrency(p90Terminal)} />
+        <Metric label="Net Carry (after tax)" value={formatCompactCurrency(totalCarryNet)} color={totalCarryNet > 0 ? "success" : undefined} />
+        <Metric label="GP Commit Total" value={formatCompactCurrency(totalGPCommit)} color={totalGPCommit > 0 ? "danger" : undefined} />
+      </div>
+
+      {comparative && (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4 grid gap-2">
+          <SectionHeader>Scenario Comparisons (250-path quick run)</SectionHeader>
+          <Row label="Base case success rate" value={formatPercentage(successRate, 1)} />
+          <Row label={`Retire ${3} years earlier (age ${Math.max(inputs.currentAge + 1, inputs.retirementAge - 3)})`} value={formatPercentage(comparative.retireEarlier, 1)} indent />
+          <Row label={`Retire ${3} years later (age ${Math.min(inputs.planningAge - 1, inputs.retirementAge + 3)})`} value={formatPercentage(comparative.retireLater, 1)} indent />
+          <Row label="Remove all carry awards" value={formatPercentage(comparative.noCarry, 1)} indent />
+          <Row label="Spend 20% more" value={formatPercentage(comparative.highSpend, 1)} indent />
+          <Row label="Spend 20% less" value={formatPercentage(comparative.lowSpend, 1)} indent />
+        </div>
+      )}
+
+      {loading && (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4">
+          <p className="text-xs text-[var(--text-muted)] text-center">Computing comparative scenarios...</p>
+          <div className="mt-3 grid gap-2">
+            {[75, 55, 85, 60].map((w, i) => <div key={i} className="h-2.5 animate-pulse rounded bg-[var(--border)]" style={{ width: `${w}%` }} />)}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4">
+        <SectionHeader>Plan Snapshot</SectionHeader>
+        <div className="grid sm:grid-cols-2 gap-x-8">
+          <div>
+            <Row label="Years to retirement" value={`${inputs.retirementAge - inputs.currentAge} years`} />
+            <Row label="Investable assets today" value={formatCompactCurrency(investable)} />
+            <Row label="Combined gross income" value={`${formatCompactCurrency(combinedIncome)}/yr`} />
+            <Row label="Go-go spending target" value={`${formatCompactCurrency(inputs.spendingGoGo)}/yr`} />
+            <Row label="Expected CAGR" value={formatPercentage(inputs.expectedReturn, 1)} />
+            <Row label="Volatility" value={formatPercentage(inputs.volatility, 0)} />
+          </div>
+          <div>
+            <Row label="SS claiming age" value={`Age ${inputs.socialSecurityAge}`} />
+            <Row label="SS annual benefit" value={`${formatCompactCurrency(inputs.socialSecurityAmount)}/yr (w/ 15% haircut)`} />
+            {inputs.hasSpouse && <Row label="Spouse SS benefit" value={`${formatCompactCurrency(inputs.spouseSocialSecurityAmount)}/yr at ${inputs.spouseSocialSecurityAge}`} />}
+            <Row label="Carry awards" value={`${inputs.carryAwards.length} awards | ${formatCompactCurrency(totalCarryNet)} net`} />
+            <Row label="GP commit obligations" value={formatCompactCurrency(totalGPCommit)} />
+            <Row label="Mortgage" value={inputs.mortgageBalance > 0 ? `${formatCompactCurrency(inputs.mortgageBalance)} | ${inputs.mortgageYearsRemaining} yrs` : "None"} />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-4 grid gap-5">
+        <SectionHeader>Narrative Analysis</SectionHeader>
+        {narrativeSections.map((s) => (
+          <NarrativeSection key={s.title} title={s.title} tone={s.tone}>{s.content}</NarrativeSection>
+        ))}
+      </div>
+
+      <p className="text-[10px] text-[var(--text-muted)] text-center">
+        Comparative scenarios use 250 simulation paths for speed and may vary slightly from the main simulation.
+        This analysis is generated from your current inputs and is not financial advice.
+      </p>
+    </div>
+  );
+}
 
 
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\dashboard\HeroVerdict.tsx
@@ -1270,7 +1570,7 @@ export function TaxBreakdownPanel() {
   const fedTaxAfterCredit = Math.max(0, totalFedTax - effectiveChildCredit);
   
   // FICA
-  const ficaSS = Math.min(combinedGross, 168600) * 0.062;
+  const ficaSS = Math.min(combinedGross, 176100) * 0.062;
   const ficaMedicare = combinedGross * 0.0145;
   const addlMedicareThreshold = isMFJ ? 250000 : 200000;
   const addlMedicare = Math.max(0, combinedGross - addlMedicareThreshold) * 0.009;
@@ -1393,7 +1693,7 @@ export function TaxBreakdownPanel() {
             Federal Tax Brackets
           </p>
           <p className="text-[10px] text-[var(--text-muted)] mb-3">
-            2024 {isMFJ ? 'Married Filing Jointly' : 'Single'} | 
+            2025 {isMFJ ? 'Married Filing Jointly' : 'Single'} | 
             AGI: {formatCompactCurrency(agi)} | 
             Marginal rate: {(marginalRate * 100).toFixed(0)}%
           </p>
@@ -1783,6 +2083,164 @@ export function AppShell() {
   );
 }
 
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\BucketDepletionChart.tsx
+import {
+  Area, AreaChart, CartesianGrid, ReferenceLine,
+  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend
+} from "recharts";
+import { useSimStore } from "../../store/useSimStore";
+import { formatCompactCurrency } from "../../lib/formatters";
+import { getInvestableAssets } from "../../engine/monteCarlo";
+
+interface BucketYear {
+  age: number;
+  taxable: number;
+  deferred: number;
+  roth: number;
+  total: number;
+}
+
+export function BucketDepletionChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const results = useSimStore((state) => state.results);
+
+  if (!results) return null;
+
+  const SS_HAIRCUT = 0.85;
+  const SS_FRA = 67;
+  function getSsFactor(age: number): number {
+    if (age <= 62) return 0.70;
+    if (age >= 70) return 1.24;
+    if (age < SS_FRA) { const e = SS_FRA - age; return e <= 3 ? 1 - e * 0.0667 : 1 - 3 * 0.0667 - (e-3)*0.05; }
+    return 1 + (age - SS_FRA) * 0.08;
+  }
+
+  function getSpending(age: number): number {
+    const idx = age - inputs.retirementAge;
+    const inf = Math.pow(1 + inputs.inflationRate, idx);
+    if (idx < inputs.goGoYears) return inputs.spendingGoGo * inf;
+    if (idx < inputs.goGoYears + inputs.slowGoYears) return inputs.spendingSlowGo * inf;
+    return (inputs.spendingNoGo + inputs.healthcareSurgeAmount) * inf;
+  }
+
+  function getNonPortfolioIncome(age: number): number {
+    let ss = 0;
+    if (age >= inputs.socialSecurityAge) {
+      ss += inputs.socialSecurityAmount * getSsFactor(inputs.socialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.socialSecurityAge));
+    }
+    if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
+      ss += inputs.spouseSocialSecurityAmount * getSsFactor(inputs.spouseSocialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.spouseSocialSecurityAge));
+    }
+    const other = inputs.otherRetirementIncome > 0 ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge) : 0;
+    return (ss + other) * 0.80; // rough after-tax
+  }
+
+  const data: BucketYear[] = [];
+
+  let taxable = inputs.taxableAssets;
+  let deferred = inputs.taxDeferredAssets;
+  let roth = inputs.taxFreeAssets;
+  const ret = inputs.expectedReturn;
+
+  for (let age = inputs.currentAge; age <= inputs.planningAge; age++) {
+    if (age < inputs.retirementAge) {
+      const preTax = inputs.annualSalary * inputs.preTaxSavingsRate;
+      const afterTax = (inputs.annualSalary * (1 - inputs.preTaxSavingsRate) * 0.65) * inputs.afterTaxSavingsRate;
+      taxable = Math.max(0, taxable * (1 + ret) + afterTax);
+      deferred = Math.max(0, deferred * (1 + ret) + preTax);
+      roth = Math.max(0, roth * (1 + ret));
+    } else {
+      taxable = Math.max(0, taxable * (1 + ret));
+      deferred = Math.max(0, deferred * (1 + ret));
+      roth = Math.max(0, roth * (1 + ret));
+
+      const spending = getSpending(age);
+      const nonPortfolio = getNonPortfolioIncome(age);
+      let needed = Math.max(0, spending - nonPortfolio);
+
+      const fromTaxable = Math.min(taxable, needed);
+      taxable -= fromTaxable;
+      needed -= fromTaxable;
+
+      if (needed > 0) {
+        const fromDeferred = Math.min(deferred, needed);
+        deferred -= fromDeferred;
+        needed -= fromDeferred;
+      }
+
+      if (needed > 0) {
+        roth = Math.max(0, roth - needed);
+      }
+    }
+
+    data.push({
+      age,
+      taxable: Math.round(Math.max(0, taxable)),
+      deferred: Math.round(Math.max(0, deferred)),
+      roth: Math.round(Math.max(0, roth)),
+      total: Math.round(Math.max(0, taxable + deferred + roth)),
+    });
+  }
+
+  const taxableDepletesAt = data.find(d => d.taxable === 0 && d.age >= inputs.retirementAge)?.age;
+  const deferredDepletesAt = data.find(d => d.deferred === 0 && d.age >= inputs.retirementAge)?.age;
+  const rothDepletesAt = data.find(d => d.roth === 0 && d.age >= inputs.retirementAge)?.age;
+
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-sm font-bold text-[var(--text-primary)]">Asset Bucket Projection</p>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          Projected balance of each account type under a median-return deterministic model using
+          sequential withdrawal: taxable first, then traditional IRA/401k, then Roth.
+        </p>
+      </div>
+
+      <div className="h-[360px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+            <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
+            <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
+            <YAxis tickFormatter={formatCompactCurrency} tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} width={72} />
+            <Tooltip
+              contentStyle={{ background: "var(--bg-card)", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
+              formatter={(v: number, name: string) => [formatCompactCurrency(v), name]}
+              labelFormatter={(age) => `Age ${age}`}
+            />
+            <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 11 }} />
+            <Area type="monotone" dataKey="taxable" name="Taxable Brokerage" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.20} strokeWidth={2} />
+            <Area type="monotone" dataKey="deferred" name="Traditional IRA/401k" stroke="#f97316" fill="#f97316" fillOpacity={0.20} strokeWidth={2} />
+            <Area type="monotone" dataKey="roth" name="Roth IRA/401k" stroke="#22c55e" fill="#22c55e" fillOpacity={0.20} strokeWidth={2} />
+            <ReferenceLine x={inputs.retirementAge} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: "Retire", fill: "#f59e0b", fontSize: 10, position: "insideTopRight" }} />
+            <ReferenceLine x={73} stroke="#8b5cf6" strokeDasharray="4 3" label={{ value: "RMDs", fill: "#8b5cf6", fontSize: 10, position: "insideTopLeft" }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Taxable depletes", value: taxableDepletesAt ? `Age ${taxableDepletesAt}` : "Survives", color: "text-[var(--accent)]" },
+          { label: "Traditional depletes", value: deferredDepletesAt ? `Age ${deferredDepletesAt}` : "Survives", color: "text-[var(--warning)]" },
+          { label: "Roth depletes", value: rothDepletesAt ? `Age ${rothDepletesAt}` : "Survives", color: "text-[var(--success)]" },
+        ].map(m => (
+          <div key={m.label} className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] p-2 text-center">
+            <p className={`text-sm font-bold ${m.color}`}>{m.value}</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{m.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[10px] text-[var(--text-muted)]">
+        This is a deterministic projection at the median expected return of {(inputs.expectedReturn * 100).toFixed(1)}%,
+        not a Monte Carlo simulation. Actual bucket balances will vary significantly across scenarios.
+        The sequential withdrawal order (taxable first) is a simplification -- optimal order depends
+        on your specific tax situation and bracket management strategy.
+      </p>
+    </div>
+  );
+}
 
 
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\InfoPage.tsx
@@ -2697,6 +3155,12 @@ import { WealthFanChart } from "../../components/charts/WealthFanChart";
 import { HeroVerdict } from "../../components/dashboard/HeroVerdict";
 import { StatCard } from "../../components/dashboard/StatCard";
 import { TaxBreakdownPanel } from "../../components/dashboard/TaxBreakdownPanel";
+import { SensitivityTornadoChart } from "./SensitivityTornadoChart";
+import { TaxDragTimelineChart } from "./TaxDragTimelineChart";
+import { BucketDepletionChart } from "./BucketDepletionChart";
+import { RetirementIncomeWaterfallChart } from "./RetirementIncomeWaterfallChart";
+import { WithdrawalRateChart } from "./WithdrawalRateChart";
+import { ExecutiveSummary } from "../../components/dashboard/ExecutiveSummary";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
@@ -2774,7 +3238,9 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Income Tax</TabsTrigger>
+              <TabsTrigger value="cashflows">Cash Flows</TabsTrigger>
               <TabsTrigger value="carry">Carry Awards</TabsTrigger>
+              <TabsTrigger value="summary">Executive Summary</TabsTrigger>
               <TabsTrigger value="info" className="data-[state=active]:text-[var(--accent)] border border-transparent data-[state=active]:border-[var(--accent)]/30">
                 How It Works
               </TabsTrigger>
@@ -2782,12 +3248,38 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
           </CardHeader>
           <CardContent className="p-3">
             <TabsContent value="rich"><RichBrokeDeadChart /></TabsContent>
-            <TabsContent value="wealth"><WealthFanChart /></TabsContent>
+            <TabsContent value="wealth">
+              <div className="grid gap-8">
+                <WealthFanChart />
+                <div className="h-px bg-[var(--border)]" />
+                <BucketDepletionChart />
+              </div>
+            </TabsContent>
             <TabsContent value="spending"><SpendingSmileChart /></TabsContent>
             <TabsContent value="scenarios"><ScenarioCompareChart /></TabsContent>
-            <TabsContent value="stress"><StressTestChart /></TabsContent>
-            <TabsContent value="tax"><TaxBreakdownPanel /></TabsContent>
+            <TabsContent value="stress">
+              <div className="grid gap-8">
+                <StressTestChart />
+                <div className="h-px bg-[var(--border)]" />
+                <SensitivityTornadoChart />
+              </div>
+            </TabsContent>
+            <TabsContent value="tax">
+              <div className="grid gap-8">
+                <TaxBreakdownPanel />
+                <div className="h-px bg-[var(--border)]" />
+                <TaxDragTimelineChart />
+              </div>
+            </TabsContent>
+            <TabsContent value="cashflows">
+              <div className="grid gap-8">
+                <RetirementIncomeWaterfallChart />
+                <div className="h-px bg-[var(--border)]" />
+                <WithdrawalRateChart />
+              </div>
+            </TabsContent>
             <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
+            <TabsContent value="summary"><ExecutiveSummary /></TabsContent>
             <TabsContent value="info"><InfoPage /></TabsContent>
           </CardContent>
         </Card>
@@ -2881,6 +3373,370 @@ export const PRESETS: Preset[] = [
     }
   }
 ];
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\RetirementIncomeWaterfallChart.tsx
+import {
+  Bar, CartesianGrid, ComposedChart, Legend, Line,
+  ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis
+} from "recharts";
+import { useSimStore } from "../../store/useSimStore";
+import { formatCompactCurrency } from "../../lib/formatters";
+import { CARRY_DISTRIBUTION_CURVE } from "../../lib/constants";
+import type { SimInputs } from "../../types";
+
+interface WaterfallYear {
+  age: number;
+  ssIncome: number;
+  carryIncome: number;
+  otherIncome: number;
+  portfolioDraw: number;
+  totalSpending: number;
+}
+
+function computeWaterfallData(inputs: SimInputs): WaterfallYear[] {
+  const SS_FRA = 67;
+  const SS_HAIRCUT = 0.85;
+  const LTCG_RATE = Math.min(0.20 + 0.038 + inputs.stateIncomeTaxRate, 0.55);
+  const ORD_RATE = 0.22 + inputs.stateIncomeTaxRate;
+
+  function getSsFactor(age: number): number {
+    if (age <= 62) return 0.70;
+    if (age >= 70) return 1.24;
+    if (age < SS_FRA) {
+      const yearsEarly = SS_FRA - age;
+      return yearsEarly <= 3 ? 1 - yearsEarly * 0.0667 : 1 - 3 * 0.0667 - (yearsEarly - 3) * 0.05;
+    }
+    return 1 + (age - SS_FRA) * 0.08;
+  }
+
+  function getSpending(age: number): number {
+    const idx = age - inputs.retirementAge;
+    const inf = Math.pow(1 + inputs.inflationRate, idx);
+    if (idx < inputs.goGoYears) return inputs.spendingGoGo * inf;
+    if (idx < inputs.goGoYears + inputs.slowGoYears) return inputs.spendingSlowGo * inf;
+    return (inputs.spendingNoGo + inputs.healthcareSurgeAmount) * inf;
+  }
+
+  const result: WaterfallYear[] = [];
+
+  for (let age = inputs.retirementAge; age <= inputs.planningAge; age++) {
+    const calYear = inputs.simulationStartYear + (age - inputs.currentAge);
+    const spending = getSpending(age);
+
+    // SS income (gross, COLA-adjusted from claiming age)
+    let ssGross = 0;
+    if (age >= inputs.socialSecurityAge) {
+      const factor = getSsFactor(inputs.socialSecurityAge);
+      const yearsInflated = Math.max(0, age - inputs.socialSecurityAge);
+      ssGross += inputs.socialSecurityAmount * factor * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, yearsInflated);
+    }
+    if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
+      const factor = getSsFactor(inputs.spouseSocialSecurityAge);
+      const yearsInflated = Math.max(0, age - inputs.spouseSocialSecurityAge);
+      ssGross += inputs.spouseSocialSecurityAmount * factor * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, yearsInflated);
+    }
+    // Apply rough SS tax (up to 85% taxable at ordinary rates)
+    const ssAfterTax = ssGross * (1 - Math.min(0.85, 1) * ORD_RATE * 0.6);
+
+    // Carry net income for this calendar year
+    let carryNet = 0;
+    for (const award of inputs.carryAwards) {
+      const fundYear = calYear - award.vintageYear + 1;
+      if (fundYear >= 1 && fundYear <= 12) {
+        const curvePct = CARRY_DISTRIBUTION_CURVE[fundYear - 1] ?? 0;
+        if (curvePct > 0) {
+          const gross = award.totalPoolValue * award.poolValueCapture * award.vestedPercent * curvePct;
+          carryNet += gross * (1 - LTCG_RATE);
+        }
+      }
+    }
+
+    // Other retirement income (after rough tax)
+    const otherGross = inputs.otherRetirementIncome > 0
+      ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge)
+      : 0;
+    const otherAfterTax = otherGross * (1 - ORD_RATE);
+
+    const nonPortfolio = ssAfterTax + carryNet + otherAfterTax;
+    const portfolioDraw = Math.max(0, spending - nonPortfolio);
+
+    result.push({
+      age,
+      ssIncome: Math.round(ssAfterTax),
+      carryIncome: Math.round(carryNet),
+      otherIncome: Math.round(otherAfterTax),
+      portfolioDraw: Math.round(portfolioDraw),
+      totalSpending: Math.round(spending),
+    });
+  }
+
+  return result;
+}
+
+export function RetirementIncomeWaterfallChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const data = computeWaterfallData(inputs);
+
+  // Decimate to every other year for readability if horizon > 25 years
+  const horizon = inputs.planningAge - inputs.retirementAge;
+  const displayData = horizon > 25 ? data.filter((_, i) => i % 2 === 0) : data;
+
+  const portfolioDependent = data.map(d => d.portfolioDraw / Math.max(1, d.totalSpending));
+  const firstMajorDrawYear = data.find(d => d.portfolioDraw / Math.max(1, d.totalSpending) > 0.5);
+
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-sm font-bold text-[var(--text-primary)]">Retirement Income Sources</p>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          How your annual spending is covered year-by-year: SS, carry, other income, and portfolio draw.
+          {firstMajorDrawYear && ` Portfolio becomes the majority income source at age ${firstMajorDrawYear.age}.`}
+        </p>
+      </div>
+
+      <div className="h-[380px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={displayData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+            <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
+            <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
+            <YAxis tickFormatter={formatCompactCurrency} tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} width={72} />
+            <Tooltip
+              contentStyle={{ background: "var(--bg-card)", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
+              formatter={(value: number, name: string) => [formatCompactCurrency(value), name]}
+              labelFormatter={(age) => `Age ${age}`}
+            />
+            <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 11 }} />
+            <Bar dataKey="ssIncome" name="Social Security (after tax)" stackId="a" fill="#38bdf8" fillOpacity={0.85} radius={[0, 0, 0, 0]} />
+            <Bar dataKey="carryIncome" name="Carry Distributions (net)" stackId="a" fill="#14b8a6" fillOpacity={0.85} />
+            <Bar dataKey="otherIncome" name="Other Income (after tax)" stackId="a" fill="#22c55e" fillOpacity={0.85} />
+            <Bar dataKey="portfolioDraw" name="Portfolio Draw" stackId="a" fill="#f97316" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
+            <Line dataKey="totalSpending" name="Total Spending" stroke="#f1f5f9" strokeWidth={1.5} dot={false} type="monotone" strokeDasharray="4 2" />
+            <ReferenceLine x={inputs.socialSecurityAge} stroke="#38bdf8" strokeDasharray="3 3" label={{ value: "SS", fill: "#38bdf8", fontSize: 10, position: "insideTopLeft" }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          { label: "Total SS (lifetime)", value: formatCompactCurrency(data.reduce((s, d) => s + d.ssIncome, 0)), color: "#38bdf8" },
+          { label: "Total Carry (lifetime)", value: formatCompactCurrency(data.reduce((s, d) => s + d.carryIncome, 0)), color: "#14b8a6" },
+          { label: "Total Portfolio Draw", value: formatCompactCurrency(data.reduce((s, d) => s + d.portfolioDraw, 0)), color: "#f97316" },
+          { label: "Portfolio Dependency", value: `${Math.round(data.reduce((s, d) => s + d.portfolioDraw, 0) / Math.max(1, data.reduce((s, d) => s + d.totalSpending, 0)) * 100)}% of spending`, color: "#94a3b8" },
+        ].map((m) => (
+          <div key={m.label} className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] p-2 text-center">
+            <p className="text-sm font-bold tabular-nums" style={{ color: m.color }}>{m.value}</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5 uppercase tracking-widest">{m.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\SensitivityTornadoChart.tsx
+import { useState, useEffect } from "react";
+import { runSimulation } from "../../engine/monteCarlo";
+import { formatPercentage } from "../../lib/formatters";
+import { useSimStore } from "../../store/useSimStore";
+
+interface TornadoBar {
+  label: string;
+  upLabel: string;
+  downLabel: string;
+  upDelta: number;
+  downDelta: number;
+  absMax: number;
+}
+
+export function SensitivityTornadoChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const results = useSimStore((state) => state.results);
+  const [bars, setBars] = useState<TornadoBar[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!results) return;
+    setLoading(true);
+    setBars([]);
+
+    const n = 250;
+    const base = results.successRate;
+
+    setTimeout(() => {
+      const perturbations: Array<{
+        label: string;
+        upLabel: string;
+        downLabel: string;
+        upInputs: typeof inputs;
+        downInputs: typeof inputs;
+      }> = [
+        {
+          label: "Expected Return",
+          upLabel: "+1%",
+          downLabel: "-1%",
+          upInputs: { ...inputs, expectedReturn: inputs.expectedReturn + 0.01, numSimulations: n },
+          downInputs: { ...inputs, expectedReturn: Math.max(0.01, inputs.expectedReturn - 0.01), numSimulations: n },
+        },
+        {
+          label: "Inflation Rate",
+          upLabel: "+0.5%",
+          downLabel: "-0.5%",
+          upInputs: { ...inputs, inflationRate: inputs.inflationRate + 0.005, numSimulations: n },
+          downInputs: { ...inputs, inflationRate: Math.max(0, inputs.inflationRate - 0.005), numSimulations: n },
+        },
+        {
+          label: "Annual Spending",
+          upLabel: "+20%",
+          downLabel: "-20%",
+          upInputs: { ...inputs, spendingGoGo: inputs.spendingGoGo * 1.2, spendingSlowGo: inputs.spendingSlowGo * 1.2, spendingNoGo: inputs.spendingNoGo * 1.2, numSimulations: n },
+          downInputs: { ...inputs, spendingGoGo: inputs.spendingGoGo * 0.8, spendingSlowGo: inputs.spendingSlowGo * 0.8, spendingNoGo: inputs.spendingNoGo * 0.8, numSimulations: n },
+        },
+        {
+          label: "Retirement Age",
+          upLabel: "+3 years",
+          downLabel: "-3 years",
+          upInputs: { ...inputs, retirementAge: Math.min(inputs.planningAge - 1, inputs.retirementAge + 3), numSimulations: n },
+          downInputs: { ...inputs, retirementAge: Math.max(inputs.currentAge + 1, inputs.retirementAge - 3), numSimulations: n },
+        },
+        {
+          label: "Social Security Benefit",
+          upLabel: "+20%",
+          downLabel: "-20%",
+          upInputs: { ...inputs, socialSecurityAmount: inputs.socialSecurityAmount * 1.2, spouseSocialSecurityAmount: inputs.spouseSocialSecurityAmount * 1.2, numSimulations: n },
+          downInputs: { ...inputs, socialSecurityAmount: inputs.socialSecurityAmount * 0.8, spouseSocialSecurityAmount: inputs.spouseSocialSecurityAmount * 0.8, numSimulations: n },
+        },
+        {
+          label: "Portfolio Volatility",
+          upLabel: "+5%",
+          downLabel: "-5%",
+          upInputs: { ...inputs, volatility: Math.min(0.4, inputs.volatility + 0.05), numSimulations: n },
+          downInputs: { ...inputs, volatility: Math.max(0.01, inputs.volatility - 0.05), numSimulations: n },
+        },
+        {
+          label: "Carry Realization",
+          upLabel: "+25% capture",
+          downLabel: "No carry",
+          upInputs: { ...inputs, carryAwards: inputs.carryAwards.map(a => ({ ...a, poolValueCapture: Math.min(1, a.poolValueCapture + 0.25) })), numSimulations: n },
+          downInputs: { ...inputs, carryAwards: [], numSimulations: n },
+        },
+      ];
+
+      const computed: TornadoBar[] = perturbations.map(p => {
+        const upRate = runSimulation(p.upInputs).successRate;
+        const downRate = runSimulation(p.downInputs).successRate;
+        const upDelta = upRate - base;
+        const downDelta = downRate - base;
+        return {
+          label: p.label,
+          upLabel: p.upLabel,
+          downLabel: p.downLabel,
+          upDelta,
+          downDelta,
+          absMax: Math.max(Math.abs(upDelta), Math.abs(downDelta)),
+        };
+      });
+
+      // Sort by absolute impact descending
+      computed.sort((a, b) => b.absMax - a.absMax);
+      setBars(computed);
+      setLoading(false);
+    }, 0);
+  }, [results?.successRate, inputs.retirementAge, inputs.spendingGoGo, inputs.expectedReturn]);
+
+  if (!results) {
+    return <p className="text-sm text-[var(--text-muted)] text-center py-8">Run the simulation to see sensitivity analysis.</p>;
+  }
+
+  const MAX_BAR_WIDTH = 160; // px, per side
+
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-sm font-bold text-[var(--text-primary)]">Sensitivity Analysis</p>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          Impact on success rate from changing each input. Bars show the delta from the base case of{" "}
+          <span className="font-bold text-[var(--accent)]">{formatPercentage(results.successRate, 1)}</span>.
+          Sorted by largest absolute impact.
+        </p>
+      </div>
+
+      {loading && (
+        <div className="grid gap-3 py-4">
+          {[1, 2, 3, 4, 5, 6, 7].map(i => (
+            <div key={i} className="h-10 animate-pulse rounded bg-[var(--border)]" />
+          ))}
+          <p className="text-xs text-[var(--text-muted)] text-center">Running 14 scenario comparisons...</p>
+        </div>
+      )}
+
+      {!loading && bars.length > 0 && (
+        <div className="grid gap-2">
+          {/* Column headers */}
+          <div className="grid items-center" style={{ gridTemplateColumns: `1fr ${MAX_BAR_WIDTH}px 1px ${MAX_BAR_WIDTH}px` }}>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Input</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--danger)] text-right pr-2">Worse</span>
+            <div />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--success)] pl-2">Better</span>
+          </div>
+
+          {bars.map((bar) => {
+            const globalMax = bars[0]?.absMax ?? 0.01;
+            const upWidth = Math.round((Math.abs(bar.upDelta) / globalMax) * MAX_BAR_WIDTH);
+            const downWidth = Math.round((Math.abs(bar.downDelta) / globalMax) * MAX_BAR_WIDTH);
+            const upIsGood = bar.upDelta > 0;
+            const downIsGood = bar.downDelta > 0;
+
+            return (
+              <div key={bar.label} className="grid items-center gap-2" style={{ gridTemplateColumns: `1fr ${MAX_BAR_WIDTH}px 1px ${MAX_BAR_WIDTH}px` }}>
+                {/* Label */}
+                <div>
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">{bar.label}</p>
+                </div>
+
+                {/* Left side (down scenario) */}
+                <div className="flex items-center justify-end gap-1">
+                  <span className="text-[10px] tabular-nums text-[var(--text-muted)] shrink-0">
+                    {bar.downDelta > 0 ? "+" : ""}{formatPercentage(bar.downDelta, 1)} ({bar.downLabel})
+                  </span>
+                  <div className="h-5 rounded-l-sm" style={{
+                    width: downWidth,
+                    background: downIsGood ? "var(--success)" : "var(--danger)",
+                    opacity: 0.8,
+                    minWidth: bar.downDelta !== 0 ? 4 : 0,
+                  }} />
+                </div>
+
+                {/* Center line */}
+                <div className="w-px h-7 bg-[var(--border)]" />
+
+                {/* Right side (up scenario) */}
+                <div className="flex items-center gap-1">
+                  <div className="h-5 rounded-r-sm" style={{
+                    width: upWidth,
+                    background: upIsGood ? "var(--success)" : "var(--danger)",
+                    opacity: 0.8,
+                    minWidth: bar.upDelta !== 0 ? 4 : 0,
+                  }} />
+                  <span className="text-[10px] tabular-nums text-[var(--text-muted)] shrink-0">
+                    {bar.upDelta > 0 ? "+" : ""}{formatPercentage(bar.upDelta, 1)} ({bar.upLabel})
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-[10px] text-[var(--text-muted)]">
+        Each scenario runs 250 paths for speed; base case uses {results ? inputs.numSimulations.toLocaleString() : "--"} paths,
+        so small deltas may reflect sampling variance rather than true sensitivity.
+        Focus on the relative ranking and magnitude rather than precise decimal values.
+      </p>
+    </div>
+  );
+}
 
 
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\Sidebar.tsx
@@ -3371,6 +4227,271 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 
 
 
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\TaxDragTimelineChart.tsx
+import {
+  Area, AreaChart, CartesianGrid, ReferenceLine,
+  ResponsiveContainer, Tooltip, XAxis, YAxis
+} from "recharts";
+import { useSimStore } from "../../store/useSimStore";
+import { formatCompactCurrency } from "../../lib/formatters";
+import { CARRY_DISTRIBUTION_CURVE } from "../../lib/constants";
+
+interface TaxYear {
+  age: number;
+  ordinaryTax: number;
+  ltcgTax: number;
+  stateTax: number;
+  totalTax: number;
+  totalIncome: number;
+  effectiveRate: number;
+}
+
+export function TaxDragTimelineChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const results = useSimStore((state) => state.results);
+
+  if (!results) return null;
+
+  const SS_HAIRCUT = 0.85;
+  const SS_FRA = 67;
+  const LTCG_FED = 0.20;
+  const NIIT = 0.038;
+  const ORD_FED = 0.22;
+
+  function getSsFactor(age: number): number {
+    if (age <= 62) return 0.70;
+    if (age >= 70) return 1.24;
+    if (age < SS_FRA) {
+      const e = SS_FRA - age;
+      return e <= 3 ? 1 - e * 0.0667 : 1 - 3 * 0.0667 - (e - 3) * 0.05;
+    }
+    return 1 + (age - SS_FRA) * 0.08;
+  }
+
+  function getSpending(age: number): number {
+    const idx = age - inputs.retirementAge;
+    const inf = Math.pow(1 + inputs.inflationRate, idx);
+    if (idx < inputs.goGoYears) return inputs.spendingGoGo * inf;
+    if (idx < inputs.goGoYears + inputs.slowGoYears) return inputs.spendingSlowGo * inf;
+    return (inputs.spendingNoGo + inputs.healthcareSurgeAmount) * inf;
+  }
+
+  const totalInvestable = inputs.taxableAssets + inputs.taxDeferredAssets + inputs.taxFreeAssets + inputs.cashReserves;
+  const deferredFrac = totalInvestable > 0 ? inputs.taxDeferredAssets / totalInvestable : 0;
+  const taxableFrac = totalInvestable > 0 ? inputs.taxableAssets / totalInvestable : 0;
+
+  const data: TaxYear[] = [];
+
+  for (let age = inputs.retirementAge; age <= inputs.planningAge; age++) {
+    const calYear = inputs.simulationStartYear + (age - inputs.currentAge);
+    const spending = getSpending(age);
+
+    let ssGross = 0;
+    if (age >= inputs.socialSecurityAge) {
+      ssGross += inputs.socialSecurityAmount * getSsFactor(inputs.socialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.socialSecurityAge));
+    }
+    if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
+      ssGross += inputs.spouseSocialSecurityAmount * getSsFactor(inputs.spouseSocialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.spouseSocialSecurityAge));
+    }
+
+    let carryGross = 0;
+    for (const award of inputs.carryAwards) {
+      const fundYear = calYear - award.vintageYear + 1;
+      if (fundYear >= 1 && fundYear <= 12) {
+        const curvePct = CARRY_DISTRIBUTION_CURVE[fundYear - 1] ?? 0;
+        if (curvePct > 0) {
+          carryGross += award.totalPoolValue * award.poolValueCapture * award.vestedPercent * curvePct;
+        }
+      }
+    }
+
+    const otherGross = inputs.otherRetirementIncome > 0
+      ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge)
+      : 0;
+
+    const nonPortfolioGross = ssGross + otherGross;
+    const portfolioDraw = Math.max(0, spending - nonPortfolioGross * 0.80 - carryGross * (1 - Math.min(LTCG_FED + NIIT + inputs.stateIncomeTaxRate, 0.55)));
+
+    const ssTaxableIncome = ssGross * 0.85;
+    const deferredDraw = portfolioDraw * deferredFrac;
+    const taxableOrdinaryIncome = ssTaxableIncome + deferredDraw + otherGross;
+    const ordinaryTax = taxableOrdinaryIncome * ORD_FED;
+
+    const taxableDraw = portfolioDraw * taxableFrac;
+    const ltcgTax = (taxableDraw + carryGross) * (LTCG_FED + NIIT);
+
+    const stateTax = (taxableOrdinaryIncome + taxableDraw) * inputs.stateIncomeTaxRate;
+
+    const totalTax = ordinaryTax + ltcgTax + stateTax;
+    const totalIncome = ssGross + otherGross + carryGross + portfolioDraw;
+    const effectiveRate = totalIncome > 0 ? totalTax / totalIncome : 0;
+
+    data.push({ age, ordinaryTax, ltcgTax, stateTax, totalTax, totalIncome, effectiveRate });
+  }
+
+  const totalLifetimeTax = data.reduce((s, d) => s + d.totalTax, 0);
+  const peakTaxYear = data.reduce((best, d) => d.totalTax > best.totalTax ? d : best, data[0]!);
+
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-sm font-bold text-[var(--text-primary)]">Estimated Retirement Tax Drag by Year</p>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          Annual estimated taxes on retirement income: ordinary income (SS + deferred withdrawals),
+          LTCG (taxable + carry), and state. Total lifetime retirement taxes:
+          {" "}<span className="font-bold text-[var(--danger)]">{formatCompactCurrency(totalLifetimeTax)}</span>.
+          Peak tax year at age {peakTaxYear?.age} ({formatCompactCurrency(peakTaxYear?.totalTax ?? 0)}).
+        </p>
+      </div>
+
+      <div className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+            <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
+            <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
+            <YAxis tickFormatter={formatCompactCurrency} tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} width={72} />
+            <Tooltip
+              contentStyle={{ background: "var(--bg-card)", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
+              formatter={(v: number, name: string) => [formatCompactCurrency(v), name]}
+              labelFormatter={(age) => `Age ${age}`}
+            />
+            <Area type="monotone" dataKey="ordinaryTax" name="Federal Ordinary (SS + deferred)" stackId="a" stroke="none" fill="#f97316" fillOpacity={0.80} />
+            <Area type="monotone" dataKey="ltcgTax" name="Federal LTCG (taxable + carry)" stackId="a" stroke="none" fill="#14b8a6" fillOpacity={0.80} />
+            <Area type="monotone" dataKey="stateTax" name="State Income Tax" stackId="a" stroke="none" fill="#8b5cf6" fillOpacity={0.80} />
+            <ReferenceLine x={73} stroke="#f59e0b" strokeDasharray="4 3" label={{ value: "RMD Age 73", fill: "#f59e0b", fontSize: 10, position: "insideTopLeft" }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="rounded-lg border border-[var(--warning)]/20 bg-[var(--warning)]/5 p-3 text-xs text-[var(--text-secondary)]">
+        <span className="font-bold text-[var(--warning)]">RMD Note: </span>
+        After age 73, Required Minimum Distributions from your {formatCompactCurrency(inputs.taxDeferredAssets)} traditional
+        IRA/401k balance force taxable withdrawals regardless of spending needs. RMDs stacked with Social Security
+        can push effective ordinary income tax rates to 24-32%, significantly above the 22% assumed here.
+        This chart may understate tax drag in the post-73 years. A Roth conversion strategy in the
+        gap between retirement and SS claiming ({inputs.retirementAge}-{inputs.socialSecurityAge}) could
+        reduce this burden materially.
+      </div>
+    </div>
+  );
+}
+
+
+// FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\layout\WithdrawalRateChart.tsx
+import {
+  Area, CartesianGrid, ComposedChart, Line, ReferenceLine,
+  ResponsiveContainer, Tooltip, XAxis, YAxis
+} from "recharts";
+import { useSimStore } from "../../store/useSimStore";
+import { formatPercentage } from "../../lib/formatters";
+
+interface WithdrawalRatePoint {
+  age: number;
+  rateP10: number;
+  rateP50: number;
+  rateP90: number;
+  band: [number, number];
+}
+
+export function WithdrawalRateChart() {
+  const inputs = useSimStore((state) => state.inputs);
+  const results = useSimStore((state) => state.results);
+  const isRunning = useSimStore((state) => state.isRunning);
+
+  if (isRunning || !results) {
+    return <div className="h-[360px] animate-pulse rounded-lg bg-[var(--border)]" />;
+  }
+
+  // Estimate annual non-portfolio income (SS + other, simplified)
+  function estimateNonPortfolioIncome(age: number): number {
+    const SS_HAIRCUT = 0.85;
+    const SS_FRA = 67;
+    function getSsFactor(a: number) {
+      if (a <= 62) return 0.70;
+      if (a >= 70) return 1.24;
+      if (a < SS_FRA) { const e = SS_FRA - a; return e <= 3 ? 1 - e * 0.0667 : 1 - 3 * 0.0667 - (e - 3) * 0.05; }
+      return 1 + (a - SS_FRA) * 0.08;
+    }
+    let ss = 0;
+    if (age >= inputs.socialSecurityAge) {
+      ss += inputs.socialSecurityAmount * getSsFactor(inputs.socialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.socialSecurityAge));
+    }
+    if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
+      ss += inputs.spouseSocialSecurityAmount * getSsFactor(inputs.spouseSocialSecurityAge) * SS_HAIRCUT * Math.pow(1 + inputs.inflationRate, Math.max(0, age - inputs.spouseSocialSecurityAge));
+    }
+    const other = inputs.otherRetirementIncome > 0
+      ? inputs.otherRetirementIncome * Math.pow(1 + inputs.inflationRate, age - inputs.retirementAge)
+      : 0;
+    return ss + other;
+  }
+
+  const data: WithdrawalRatePoint[] = results.percentilePaths
+    .filter(p => p.age >= inputs.retirementAge)
+    .map((p, i) => {
+      const spending = results.yearlyMedianSpend[inputs.retirementAge - inputs.currentAge + i] ?? 0;
+      const nonPortfolio = estimateNonPortfolioIncome(p.age);
+      const netDraw = Math.max(0, spending - nonPortfolio);
+      const rateP10 = p.p10 > 0 ? (netDraw / p.p10) : 0;
+      const rateP50 = p.p50 > 0 ? (netDraw / p.p50) : 0;
+      const rateP90 = p.p90 > 0 ? (netDraw / p.p90) : 0;
+      return {
+        age: p.age,
+        rateP10: Math.min(rateP10, 0.30),
+        rateP50: Math.min(rateP50, 0.30),
+        rateP90: Math.min(rateP90, 0.30),
+        band: [Math.min(rateP90, 0.30), Math.min(rateP10, 0.30)] as [number, number],
+      };
+    });
+
+  const firstDangerAge = data.find(d => d.rateP50 > 0.05)?.age;
+  const firstUnsafeAge = data.find(d => d.rateP10 > 0.08)?.age;
+
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-sm font-bold text-[var(--text-primary)]">Portfolio Withdrawal Rate Over Time</p>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          Net portfolio draw as a percentage of portfolio value at each age.
+          Below 4% is considered safe; above 6-8% in bad scenarios is a warning sign.
+          {firstDangerAge && ` Median rate exceeds 5% starting around age ${firstDangerAge}.`}
+        </p>
+      </div>
+
+      <div className="h-[340px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+            <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
+            <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
+            <YAxis
+              tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+              tick={{ fill: "#94a3b8", fontSize: 11 }}
+              tickLine={false} axisLine={false} width={48}
+              domain={[0, 0.20]}
+            />
+            <Tooltip
+              contentStyle={{ background: "var(--bg-card)", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}
+              formatter={(value: number, name: string) => [`${(value * 100).toFixed(1)}%`, name]}
+              labelFormatter={(age) => `Age ${age}`}
+            />
+            <Area type="monotone" dataKey="band" name="10th-90th pct range" stroke="none" fill="#14b8a6" fillOpacity={0.10} activeDot={false} />
+            <ReferenceLine y={0.04} stroke="#22c55e" strokeDasharray="5 3" label={{ value: "4% safe rate", fill: "#22c55e", fontSize: 10, position: "insideTopRight" }} />
+            <ReferenceLine y={0.06} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: "6% caution", fill: "#f59e0b", fontSize: 10, position: "insideTopRight" }} />
+            <ReferenceLine y={0.08} stroke="#ef4444" strokeDasharray="5 3" label={{ value: "8% danger", fill: "#ef4444", fontSize: 10, position: "insideTopRight" }} />
+            <Line dataKey="rateP10" name="10th pct (bad scenario)" stroke="#ef4444" strokeWidth={1.5} dot={false} type="monotone" />
+            <Line dataKey="rateP50" name="Median" stroke="#e2fffb" strokeWidth={2} dot={false} type="monotone" />
+            <Line dataKey="rateP90" name="90th pct (good scenario)" stroke="#22c55e" strokeWidth={1.5} dot={false} type="monotone" />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-3 text-xs text-[var(--text-secondary)]">
+        <strong className="text-[var(--text-primary)]">How to read this:</strong> In a good scenario (green, 90th percentile wealth), your large portfolio means a small withdrawal rate even on significant spending. In a bad scenario (red, 10th percentile), a depleted portfolio requires a high withdrawal rate to maintain spending -- eventually unsustainable. When the red line exceeds 8%, those paths are approaching ruin. The 4% green reference line represents the conventional "safe withdrawal rate" from financial planning research.
+      </div>
+    </div>
+  );
+}
+
+
 // FILE: C:\Users\armin\Desktop\Monte Carlo\src\components\ui\accordion.tsx
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronDown } from "lucide-react";
@@ -3502,7 +4623,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variants = {
   primary: "bg-accent text-slate-950 hover:bg-teal-300",
-  secondary: "border border-border bg-white/[0.04] text-primaryText hover:bg-white/[0.08]",
+  secondary: "border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-primary)] hover:bg-[var(--bg-card)]",
   ghost: "text-mutedText hover:bg-white/[0.06] hover:text-primaryText",
   danger: "bg-danger/15 text-red-200 hover:bg-danger/25",
 };
@@ -4951,6 +6072,20 @@ input[type="number"] {
 }
 :root[data-theme="sepia"] .recharts-text {
   fill: #a08060;
+}
+
+:root[data-theme="light"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #e2e8f0 !important;
+}
+:root[data-theme="sepia"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #4a3728 !important;
+}
+
+:root[data-theme="light"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #e2e8f0 !important;
+}
+:root[data-theme="sepia"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #4a3728 !important;
 }
 
 

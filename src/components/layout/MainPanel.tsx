@@ -9,12 +9,12 @@ import { WealthFanChart } from "../../components/charts/WealthFanChart";
 import { HeroVerdict } from "../../components/dashboard/HeroVerdict";
 import { StatCard } from "../../components/dashboard/StatCard";
 import { TaxBreakdownPanel } from "../../components/dashboard/TaxBreakdownPanel";
-import { SensitivityTornadoChart } from "./SensitivityTornadoChart";
-import { TaxDragTimelineChart } from "./TaxDragTimelineChart";
-import { BucketDepletionChart } from "./BucketDepletionChart";
+import { ExecutiveSummary } from "../../components/dashboard/ExecutiveSummary";
 import { RetirementIncomeWaterfallChart } from "./RetirementIncomeWaterfallChart";
 import { WithdrawalRateChart } from "./WithdrawalRateChart";
-import { ExecutiveSummary } from "../../components/dashboard/ExecutiveSummary";
+import { SensitivityTornadoChart } from "../../components/charts/SensitivityTornadoChart";
+import { TaxDragTimelineChart } from "./TaxDragTimelineChart";
+import { BucketDepletionChart } from "./BucketDepletionChart";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
@@ -92,8 +92,8 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
               <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
               <TabsTrigger value="stress">Stress Tests</TabsTrigger>
               <TabsTrigger value="tax">Income Tax</TabsTrigger>
-              <TabsTrigger value="cashflows">Cash Flows</TabsTrigger>
               <TabsTrigger value="carry">Carry Awards</TabsTrigger>
+              <TabsTrigger value="cashflows">Cash Flows</TabsTrigger>
               <TabsTrigger value="summary">Executive Summary</TabsTrigger>
               <TabsTrigger value="info" className="data-[state=active]:text-[var(--accent)] border border-transparent data-[state=active]:border-[var(--accent)]/30">
                 How It Works
@@ -125,6 +125,7 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
                 <TaxDragTimelineChart />
               </div>
             </TabsContent>
+            <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
             <TabsContent value="cashflows">
               <div className="grid gap-8">
                 <RetirementIncomeWaterfallChart />
@@ -132,7 +133,6 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
                 <WithdrawalRateChart />
               </div>
             </TabsContent>
-            <TabsContent value="carry"><CarryAwardsChart /></TabsContent>
             <TabsContent value="summary"><ExecutiveSummary /></TabsContent>
             <TabsContent value="info"><InfoPage /></TabsContent>
           </CardContent>
