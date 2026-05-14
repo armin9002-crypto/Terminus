@@ -109,8 +109,6 @@ export function RetirementIncomeWaterfallChart() {
   const inputs = useSimStore((s) => s.inputs);
   const data = computeWaterfallData(inputs);
 
-  const horizon = inputs.planningAge - inputs.currentAge;
-  const displayData = horizon > 25 ? data.filter((_, i) => i % 2 === 0) : data;
   const firstMajorDrawYear = data.find(d => d.portfolioDraw / Math.max(1, d.totalSpending) > 0.5);
   const totalSalary = data.reduce((s, d) => s + d.salaryIncome, 0);
   const totalSS = data.reduce((s, d) => s + d.ssIncome, 0);
@@ -131,9 +129,18 @@ export function RetirementIncomeWaterfallChart() {
 
       <div className="h-[380px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={displayData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+          <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 32, left: 8 }} barCategoryGap="8%">
             <CartesianGrid stroke="#2d3748" strokeOpacity={0.4} vertical={false} />
-            <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
+            <XAxis
+              dataKey="age"
+              interval={0}
+              angle={-45}
+              textAnchor="end"
+              height={48}
+              tick={{ fill: "#94a3b8", fontSize: 9 }}
+              tickLine={false}
+              axisLine={{ stroke: "#2d3748" }}
+            />
             <YAxis tickFormatter={formatCompactCurrency} tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} width={72} />
             <Tooltip
               contentStyle={{ background: "var(--bg-card)", border: "1px solid #2d3748", borderRadius: 8, color: "#f1f5f9" }}

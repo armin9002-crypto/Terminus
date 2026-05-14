@@ -21,6 +21,25 @@
 }
 
 :root[data-theme="light"] {
+  --bg-primary: #eef3f7;
+  --bg-secondary: #e3eaf1;
+  --bg-card: #f8fbfd;
+  --bg-card-hover: #edf4f8;
+  --border: #aab8c5;
+  --border-subtle: #cbd5df;
+  --accent: #0f766e;
+  --accent-glow: rgba(15, 118, 110, 0.14);
+  --success: #15803d;
+  --warning: #a16207;
+  --danger: #b91c1c;
+  --text-primary: #0b1220;
+  --text-secondary: #263548;
+  --text-muted: #526174;
+  --scrollbar-thumb: #aab8c5;
+  --noise-opacity: 0.02;
+}
+
+:root[data-theme="graphite"] {
   --bg-primary: #0b1220;
   --bg-secondary: #111827;
   --bg-card: #182235;
@@ -40,6 +59,25 @@
 }
 
 :root[data-theme="sepia"] {
+  --bg-primary: #211a14;
+  --bg-secondary: #2a2119;
+  --bg-card: #34291f;
+  --bg-card-hover: #403225;
+  --border: #6b5847;
+  --border-subtle: #4a3a2c;
+  --accent: #f0b36d;
+  --accent-glow: rgba(240, 179, 109, 0.16);
+  --success: #9bd37a;
+  --warning: #f6c445;
+  --danger: #ff7b7b;
+  --text-primary: #fff7ed;
+  --text-secondary: #ecd9c4;
+  --text-muted: #c4a98f;
+  --scrollbar-thumb: #6b5847;
+  --noise-opacity: 0.035;
+}
+
+:root[data-theme="midnight"] {
   --bg-primary: #101015;
   --bg-secondary: #181922;
   --bg-card: #202330;
@@ -119,33 +157,67 @@ input[type="number"] {
 }
 
 :root[data-theme="light"] .recharts-cartesian-grid line {
-  stroke: #3b4a61;
+  stroke: #aab8c5;
 }
 :root[data-theme="light"] .recharts-text {
-  fill: #9fb3c8;
+  fill: #526174;
 }
 :root[data-theme="light"] .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #f8fbfd !important;
+  border-color: #aab8c5 !important;
+  color: #0b1220 !important;
+}
+:root[data-theme="graphite"] .recharts-cartesian-grid line {
+  stroke: #3b4a61;
+}
+:root[data-theme="graphite"] .recharts-text {
+  fill: #9fb3c8;
+}
+:root[data-theme="graphite"] .recharts-tooltip-wrapper .recharts-default-tooltip {
   background: #182235 !important;
   border-color: #3b4a61 !important;
   color: #f8fafc !important;
 }
 :root[data-theme="sepia"] .recharts-cartesian-grid line {
-  stroke: #424657;
+  stroke: #6b5847;
 }
 :root[data-theme="sepia"] .recharts-text {
+  fill: #c4a98f;
+}
+:root[data-theme="sepia"] .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #34291f !important;
+  border-color: #6b5847 !important;
+  color: #fff7ed !important;
+}
+:root[data-theme="midnight"] .recharts-cartesian-grid line {
+  stroke: #424657;
+}
+:root[data-theme="midnight"] .recharts-text {
   fill: #a1a9b8;
 }
 
 :root[data-theme="light"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #d7e0e8 !important;
+}
+:root[data-theme="graphite"] .animate-pulse [class*="bg-slate-7"] {
   background-color: #253247 !important;
 }
 :root[data-theme="sepia"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #4a3a2c !important;
+}
+:root[data-theme="midnight"] .animate-pulse [class*="bg-slate-7"] {
   background-color: #2a2d3d !important;
 }
 
 :root[data-theme="light"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #d7e0e8 !important;
+}
+:root[data-theme="graphite"] .animate-pulse [class*="bg-slate-7"] {
   background-color: #253247 !important;
 }
 :root[data-theme="sepia"] .animate-pulse [class*="bg-slate-7"] {
+  background-color: #4a3a2c !important;
+}
+:root[data-theme="midnight"] .animate-pulse [class*="bg-slate-7"] {
   background-color: #2a2d3d !important;
 }

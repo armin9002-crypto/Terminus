@@ -1,1 +1,1 @@
-export type Theme = 'dark' | 'light' | 'sepia';
+export type Theme = 'dark' | 'graphite' | 'light' | 'sepia' | 'midnight';

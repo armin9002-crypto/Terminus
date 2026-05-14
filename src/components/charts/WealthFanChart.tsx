@@ -14,6 +14,7 @@ import {
 import { Slider } from "../../components/ui/slider";
 import { formatCompactCurrency, formatMillions } from "../../lib/formatters";
 import { useSimStore } from "../../store/useSimStore";
+import { getAccumulationSummary } from "../../engine/monteCarlo";
 import type { PercentilesAtAge } from "../../types";
 
 interface ChartDatum extends PercentilesAtAge {
@@ -36,15 +37,17 @@ export function WealthFanChart() {
   const setInput = useSimStore((state) => state.setInput);
   const isRunning = useSimStore((state) => state.isRunning);
 
-  const [showWide, setShowWide] = useState(false);
-  const [showNarrow, setShowNarrow] = useState(false);
+  const [showWide, setShowWide] = useState(true);
+  const [showNarrow, setShowNarrow] = useState(true);
   const [showReal, setShowReal] = useState(false);
 
   const combinedSalary = inputs.annualSalary + (inputs.hasSpouse ? inputs.spouseAnnualSalary : 0);
   const yearsToRetirement = inputs.retirementAge - inputs.currentAge;
+  const accumulation = getAccumulationSummary(inputs);
 
   const retirePoint = results?.percentilePaths.find(p => p.age === inputs.retirementAge);
   const retirePlusFive = results?.percentilePaths.find(p => p.age === inputs.retirementAge + 5);
+  const terminalPoint = results?.percentilePaths[results.percentilePaths.length - 1];
   
   const sequenceRisk = retirePoint && retirePlusFive && retirePoint.p10 > 0
     ? (retirePlusFive.p10 - retirePoint.p10) / retirePoint.p10
@@ -127,6 +130,12 @@ export function WealthFanChart() {
               label={{ value: "Retire", fill: "#f59e0b", position: "insideTopRight" }}
             />
             <ReferenceLine
+              y={toReal(accumulation.estimatedRetirementAssets, inputs.retirementAge)}
+              stroke="#a78bfa"
+              strokeDasharray="3 4"
+              label={{ value: "Planning estimate", fill: "#c4b5fd", position: "insideTopLeft", fontSize: 11 }}
+            />
+            <ReferenceLine
               x={inputs.socialSecurityAge}
               stroke="#38bdf8"
               strokeDasharray="5 5"
@@ -157,6 +166,20 @@ export function WealthFanChart() {
             <Line type="monotone" dataKey="p50" name="Median" stroke="#e2fffb" strokeWidth={2} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-md border border-[var(--border)] bg-[var(--bg-card)] p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Median at retirement</p>
+          <p className="mt-1 text-lg font-bold text-[var(--text-primary)]">{retirePoint ? formatCompactCurrency(toReal(retirePoint.p50, inputs.retirementAge)) : "--"}</p>
+        </div>
+        <div className="rounded-md border border-[var(--border)] bg-[var(--bg-card)] p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Simple planning estimate</p>
+          <p className="mt-1 text-lg font-bold text-violet-200">{formatCompactCurrency(toReal(accumulation.estimatedRetirementAssets, inputs.retirementAge))}</p>
+        </div>
+        <div className="rounded-md border border-[var(--border)] bg-[var(--bg-card)] p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Median terminal</p>
+          <p className="mt-1 text-lg font-bold text-[var(--accent)]">{terminalPoint ? formatCompactCurrency(toReal(terminalPoint.p50, inputs.planningAge)) : "--"}</p>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-4 rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
         <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -204,8 +227,9 @@ export function WealthFanChart() {
       </div>
       <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mt-2">
         Combined pre-retirement income: {formatCompactCurrency(combinedSalary)}/yr 
-        over {yearsToRetirement} years. Showing {inputs.numSimulations.toLocaleString()} simulated paths
+        over {yearsToRetirement} years, with estimated savings of {formatCompactCurrency(accumulation.annualSavings)}/yr. Showing {inputs.numSimulations.toLocaleString()} simulated paths
         {showReal ? ` in real (${(inputs.inflationRate * 100).toFixed(1)}% inflation-adjusted) ${new Date().getFullYear()} dollars` : " in nominal dollars"}.
+        The violet planning line is a deterministic reference using current assets, expected return, and estimated annual savings; the median Monte Carlo line can differ because it includes volatility, taxes, bucket withdrawals, college, mortgage, capital calls, and retirement spending.
       </p>
       {sequenceRisk < -0.25 && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm">

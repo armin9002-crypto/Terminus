@@ -1,7 +1,6 @@
 import { BookOpen, HelpCircle, Menu, Share2, X } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "../../lib/useTheme";
-import { Theme } from "../../lib/theme";
 import { Button } from "../../components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { formatCompactCurrency } from "../../lib/formatters";
@@ -19,11 +18,13 @@ export function AppShell() {
   const numSimulations = useSimStore((state) => state.inputs.numSimulations);
   const resetInputs = useSimStore(state => state.resetInputs);
 
-  const themeOrder = ['dark', 'light', 'sepia'] as const;
+  const themeOrder = ['dark', 'graphite', 'light', 'sepia', 'midnight'] as const;
   const themeLabels: Record<string, string> = {
     dark: 'Dark',
-    light: 'Graphite',
-    sepia: 'Midnight'
+    graphite: 'Graphite',
+    light: 'Light',
+    sepia: 'Sepia',
+    midnight: 'Midnight'
   };
 
   const cycleTheme = () => {
@@ -36,8 +37,16 @@ export function AppShell() {
     <div className="min-h-screen bg-background text-primaryText">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-xl">
         <div className="flex h-[56px] items-center justify-between px-4 lg:px-6">
-          <div>
-            <p className="bg-gradient-to-r from-teal-400 to-blue-400 bg-clip-text text-lg font-extrabold uppercase tracking-widest text-transparent">Terminus</p>
+          <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-1">
+              <span className="text-[10px] font-black uppercase tracking-[0.34em] text-[var(--text-muted)]">the</span>
+              <span className="bg-gradient-to-r from-teal-300 via-sky-300 to-blue-400 bg-clip-text text-xl font-black tracking-[-0.02em] text-transparent">
+                Number
+              </span>
+            </div>
+            <span className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)] sm:inline">
+              Private Wealth Lab
+            </span>
           </div>
 
           <button
@@ -49,8 +58,10 @@ export function AppShell() {
               hover:text-[var(--accent)] transition-all"
           >
             <span className="h-2 w-2 rounded-full" style={{
-              background: theme === 'dark' ? '#14b8a6' 
-                : theme === 'light' ? '#2dd4bf'
+              background: theme === 'dark' ? '#14b8a6'
+                : theme === 'graphite' ? '#2dd4bf'
+                : theme === 'light' ? '#0f766e'
+                : theme === 'sepia' ? '#f0b36d'
                 : '#38bdf8'
             }} />
             {themeLabels[theme]}
@@ -79,7 +90,7 @@ export function AppShell() {
             <Button variant="ghost" className="size-9 px-0" aria-label="Share" onClick={() => { setToast(true); window.setTimeout(() => setToast(false), 1800); }}><Share2 size={17} /></Button>
             <Tooltip>
               <TooltipTrigger asChild><Button variant="ghost" className="size-9 px-0" aria-label="Help"><HelpCircle size={17} /></Button></TooltipTrigger>
-              <TooltipContent className="max-w-xs rounded-md border border-border bg-[#1e293b] p-3 text-sm text-primaryText">Terminus models your complete financial picture using Monte Carlo simulation across thousands of possible futures.</TooltipContent>
+              <TooltipContent className="max-w-xs rounded-md border border-border bg-[#1e293b] p-3 text-sm text-primaryText">the Number models your complete financial picture using Monte Carlo simulation across thousands of possible futures.</TooltipContent>
             </Tooltip>
           </div>
         </div>
