@@ -50,8 +50,8 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               </div>
               {inputs.hasSpouse && (
                 <div className="grid grid-cols-2 gap-2">
-                  <AgeInput label="Spouse age" value={inputs.spouseCurrentAge} min={30} max={70} onChange={(value) => setInput("spouseCurrentAge", value)} />
-                  <AgeInput label="Spouse retire" value={inputs.spouseRetirementAge} min={40} max={75} onChange={(value) => setInput("spouseRetirementAge", value)} />
+                  <AgeInput label="Spouse age" value={inputs.spouseCurrentAge} min={30} max={70} error={errors.spouseCurrentAge} onChange={(value) => setInput("spouseCurrentAge", value)} />
+                  <AgeInput label="Spouse retire" value={inputs.spouseRetirementAge} min={40} max={75} error={errors.spouseRetirementAge} onChange={(value) => setInput("spouseRetirementAge", value)} />
                 </div>
               )}
             </AccordionContent>
@@ -59,28 +59,21 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 
           <AccordionItem value="assets" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Your Assets <Chip>{formatCompactCurrency(investable)} liquid</Chip></AccordionTrigger>
-            <AccordionContent className="grid gap-1.5">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)] mb-0.5">Taxable</p>
-                  <input type="number" value={inputs.taxableAssets} onChange={(e) => setInput("taxableAssets", Number(e.target.value))} className="h-8 w-full rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 text-xs text-primaryText outline-none focus:border-[var(--accent)]" />
+            <AccordionContent className="grid gap-2">
+              <CurrencyInput label="Taxable brokerage" value={inputs.taxableAssets} max={20_000_000} step={25_000} error={errors.taxableAssets} onChange={(value) => setInput("taxableAssets", value)} />
+              <CurrencyInput label="Traditional 401k / IRA" value={inputs.taxDeferredAssets} max={10_000_000} step={25_000} error={errors.taxDeferredAssets} onChange={(value) => setInput("taxDeferredAssets", value)} />
+              <CurrencyInput label="Roth / tax-free" value={inputs.taxFreeAssets} max={10_000_000} step={25_000} error={errors.taxFreeAssets} onChange={(value) => setInput("taxFreeAssets", value)} />
+              <CurrencyInput label="Cash / emergency fund" value={inputs.cashReserves} max={5_000_000} step={10_000} error={errors.cashReserves} onChange={(value) => setInput("cashReserves", value)} />
+              <CurrencyInput label="Illiquid assets incl. home" value={inputs.illiquidAssets} max={30_000_000} step={50_000} error={errors.illiquidAssets} onChange={(value) => setInput("illiquidAssets", value)} />
+              <div className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Total net worth</span>
+                  <span className="text-sm font-bold text-[var(--text-primary)]">{formatCompactCurrency(totalNW)}</span>
                 </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)] mb-0.5">Traditional (401k/IRA)</p>
-                  <input type="number" value={inputs.taxDeferredAssets} onChange={(e) => setInput("taxDeferredAssets", Number(e.target.value))} className="h-8 w-full rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 text-xs text-primaryText outline-none focus:border-[var(--accent)]" />
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Investable assets</span>
+                  <span className="text-sm font-bold text-[var(--accent)]">{formatCompactCurrency(investable)} ({liquidPct.toFixed(0)}% liquid)</span>
                 </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)] mb-0.5">Roth (401k/IRA)</p>
-                  <input type="number" value={inputs.taxFreeAssets} onChange={(e) => setInput("taxFreeAssets", Number(e.target.value))} className="h-8 w-full rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 text-xs text-primaryText outline-none focus:border-[var(--accent)]" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)] mb-0.5">Cash</p>
-                  <input type="number" value={inputs.cashReserves} onChange={(e) => setInput("cashReserves", Number(e.target.value))} className="h-8 w-full rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 text-xs text-primaryText outline-none focus:border-[var(--accent)]" />
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)] mb-0.5">Illiquid (incl. home)</p>
-                <input type="number" value={inputs.illiquidAssets} onChange={(e) => setInput("illiquidAssets", Number(e.target.value))} className="h-8 w-full rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 text-xs text-primaryText outline-none focus:border-[var(--accent)]" />
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -108,6 +101,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                 value={inputs.spendingGoGo} 
                 min={50000} max={500000} step={5000} 
                 format="currency"
+                error={errors.spendingGoGo}
                 onChange={(v) => setInput('spendingGoGo', v)} 
               />
               <SliderInput 
@@ -115,6 +109,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                 value={inputs.spendingSlowGo} 
                 min={30000} max={400000} step={5000} 
                 format="currency"
+                error={errors.spendingSlowGo}
                 onChange={(v) => setInput('spendingSlowGo', v)} 
               />
               <SliderInput 
@@ -122,6 +117,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                 value={inputs.spendingNoGo} 
                 min={20000} max={300000} step={5000} 
                 format="currency"
+                error={errors.spendingNoGo}
                 onChange={(v) => setInput('spendingNoGo', v)} 
               />
               <SliderInput 
@@ -129,18 +125,21 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                 value={inputs.healthcareSurgeAmount} 
                 min={0} max={60000} step={2500} 
                 format="currency"
+                error={errors.healthcareSurgeAmount}
                 onChange={(v) => setInput('healthcareSurgeAmount', v)} 
               />
               <SliderInput 
                 label="Go-Go phase length (years)" 
                 value={inputs.goGoYears} 
                 min={5} max={15} step={1}
+                error={errors.goGoYears}
                 onChange={(v) => setInput('goGoYears', v)} 
               />
               <SliderInput 
                 label="Slow-Go phase length (years)" 
                 value={inputs.slowGoYears} 
                 min={5} max={15} step={1}
+                error={errors.slowGoYears}
                 onChange={(v) => setInput('slowGoYears', v)} 
               />
               <SliderInput 
@@ -148,6 +147,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                 value={inputs.inflationRate} 
                 min={0} max={0.1} step={0.001} 
                 format="percent"
+                error={errors.inflationRate}
                 onChange={(v) => setInput('inflationRate', v)} 
               />
             </AccordionContent>
@@ -156,8 +156,8 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           <AccordionItem value="market" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Market <Chip>{(inputs.expectedReturn * 100).toFixed(1)}% Return</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
-              <SliderInput label="Expected Return" value={inputs.expectedReturn} min={0.01} max={0.15} step={0.005} format="percent" onChange={(v) => setInput("expectedReturn", v)} />
-              <SliderInput label="Volatility" value={inputs.volatility} min={0.01} max={0.3} step={0.01} format="percent" onChange={(v) => setInput("volatility", v)} />
+              <SliderInput label="Expected Return" value={inputs.expectedReturn} min={0.01} max={0.15} step={0.005} format="percent" error={errors.expectedReturn} onChange={(v) => setInput("expectedReturn", v)} />
+              <SliderInput label="Volatility" value={inputs.volatility} min={0.01} max={0.3} step={0.01} format="percent" error={errors.volatility} onChange={(v) => setInput("volatility", v)} />
             </AccordionContent>
           </AccordionItem>
 
@@ -167,19 +167,19 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               <Chip>SS {inputs.socialSecurityAge}</Chip>
             </AccordionTrigger>
             <AccordionContent className="grid gap-2">
-              <CurrencyInput label="Your annual salary (pre-retirement)" value={inputs.annualSalary} max={2000000} step={25000} onChange={(v) => setInput('annualSalary', v)} />
+              <CurrencyInput label="Your annual salary (pre-retirement)" value={inputs.annualSalary} max={2000000} step={25000} error={errors.annualSalary} onChange={(v) => setInput('annualSalary', v)} />
               {inputs.hasSpouse && (
-                <CurrencyInput label="Spouse annual salary" value={inputs.spouseAnnualSalary} max={2000000} step={25000} onChange={(v) => setInput('spouseAnnualSalary', v)} />
+                <CurrencyInput label="Spouse annual salary" value={inputs.spouseAnnualSalary} max={2000000} step={25000} error={errors.spouseAnnualSalary} onChange={(v) => setInput('spouseAnnualSalary', v)} />
               )}
-              <SliderInput label="Your Social Security claiming age" value={inputs.socialSecurityAge} min={62} max={70} step={1} onChange={(v) => setInput('socialSecurityAge', v)} />
-              <CurrencyInput label="Your SS annual benefit" value={inputs.socialSecurityAmount} max={60000} step={1000} onChange={(v) => setInput('socialSecurityAmount', v)} />
+              <SliderInput label="Your Social Security claiming age" value={inputs.socialSecurityAge} min={62} max={70} step={1} error={errors.socialSecurityAge} onChange={(v) => setInput('socialSecurityAge', v)} />
+              <CurrencyInput label="Your SS annual benefit" value={inputs.socialSecurityAmount} max={60000} step={1000} error={errors.socialSecurityAmount} onChange={(v) => setInput('socialSecurityAmount', v)} />
               {inputs.hasSpouse && (
                 <>
-                  <SliderInput label="Spouse SS claiming age" value={inputs.spouseSocialSecurityAge} min={62} max={70} step={1} onChange={(v) => setInput('spouseSocialSecurityAge', v)} />
-                  <CurrencyInput label="Spouse SS annual benefit" value={inputs.spouseSocialSecurityAmount} max={60000} step={1000} onChange={(v) => setInput('spouseSocialSecurityAmount', v)} />
+                  <SliderInput label="Spouse SS claiming age" value={inputs.spouseSocialSecurityAge} min={62} max={70} step={1} error={errors.spouseSocialSecurityAge} onChange={(v) => setInput('spouseSocialSecurityAge', v)} />
+                  <CurrencyInput label="Spouse SS annual benefit" value={inputs.spouseSocialSecurityAmount} max={60000} step={1000} error={errors.spouseSocialSecurityAmount} onChange={(v) => setInput('spouseSocialSecurityAmount', v)} />
                 </>
               )}
-              <CurrencyInput label="Other annual retirement income" value={inputs.otherRetirementIncome} max={500000} step={5000} onChange={(v) => setInput('otherRetirementIncome', v)} />
+              <CurrencyInput label="Other annual retirement income" value={inputs.otherRetirementIncome} max={500000} step={5000} error={errors.otherRetirementIncome} onChange={(v) => setInput('otherRetirementIncome', v)} />
             </AccordionContent>
           </AccordionItem>
 
@@ -213,10 +213,10 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                 </div>
               </div>
               
-              <SliderInput label="Number of dependents" value={inputs.numDependents} min={0} max={5} step={1} onChange={(v) => setInput('numDependents', v)} />
-              <SliderInput label="State income tax rate" value={inputs.stateIncomeTaxRate} min={0} max={0.133} step={0.001} format="percent" onChange={(v) => setInput('stateIncomeTaxRate', v)} />
-              <SliderInput label="Pre-tax savings rate" value={inputs.preTaxSavingsRate} min={0} max={0.30} step={0.01} format="percent" onChange={(v) => setInput('preTaxSavingsRate', v)} />
-              <SliderInput label="After-tax savings rate" value={inputs.afterTaxSavingsRate} min={0} max={0.60} step={0.01} format="percent" onChange={(v) => setInput('afterTaxSavingsRate', v)} />
+              <SliderInput label="Number of dependents" value={inputs.numDependents} min={0} max={5} step={1} error={errors.numDependents} onChange={(v) => setInput('numDependents', v)} />
+              <SliderInput label="State income tax rate" value={inputs.stateIncomeTaxRate} min={0} max={0.133} step={0.001} format="percent" error={errors.stateIncomeTaxRate} onChange={(v) => setInput('stateIncomeTaxRate', v)} />
+              <SliderInput label="Pre-tax savings rate" value={inputs.preTaxSavingsRate} min={0} max={0.30} step={0.01} format="percent" error={errors.preTaxSavingsRate} onChange={(v) => setInput('preTaxSavingsRate', v)} />
+              <SliderInput label="After-tax savings rate" value={inputs.afterTaxSavingsRate} min={0} max={0.60} step={0.01} format="percent" error={errors.afterTaxSavingsRate} onChange={(v) => setInput('afterTaxSavingsRate', v)} />
               
               <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2 grid gap-2">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Estimated Tax Breakdown</p>
@@ -269,6 +269,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               </Chip>
             </AccordionTrigger>
             <AccordionContent className="grid gap-2">
+              {errors.carryAwards && <p className="text-[10px] text-[var(--danger)]">{errors.carryAwards}</p>}
               {inputs.carryAwards.length === 0 && <p className="text-center text-xs text-[var(--text-muted)] py-4">No carry awards added.</p>}
 
               {inputs.carryAwards.map((award) => (
@@ -395,10 +396,10 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           <AccordionItem value="liabilities" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger>Liabilities & Obligations <Chip>{formatCompactCurrency(inputs.mortgageBalance)}</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
-              <CurrencyInput label="Mortgage balance" value={inputs.mortgageBalance} max={3000000} onChange={(v) => setInput('mortgageBalance', v)} />
-              <CurrencyInput label="Annual mortgage payment" value={inputs.mortgageAnnualPayment} max={250000} step={5000} onChange={(v) => setInput('mortgageAnnualPayment', v)} />
-              <SliderInput label="Years remaining on mortgage" value={inputs.mortgageYearsRemaining} min={0} max={30} step={1} onChange={(v) => setInput('mortgageYearsRemaining', v)} />
-              <CurrencyInput label="Annual capital call obligations" value={inputs.capitalCallObligations} max={500000} step={10000} onChange={(v) => setInput('capitalCallObligations', v)} />
+              <CurrencyInput label="Mortgage balance" value={inputs.mortgageBalance} max={3000000} error={errors.mortgageBalance} onChange={(v) => setInput('mortgageBalance', v)} />
+              <CurrencyInput label="Annual mortgage payment" value={inputs.mortgageAnnualPayment} max={250000} step={5000} error={errors.mortgageAnnualPayment} onChange={(v) => setInput('mortgageAnnualPayment', v)} />
+              <SliderInput label="Years remaining on mortgage" value={inputs.mortgageYearsRemaining} min={0} max={30} step={1} error={errors.mortgageYearsRemaining} onChange={(v) => setInput('mortgageYearsRemaining', v)} />
+              <CurrencyInput label="Annual capital call obligations" value={inputs.capitalCallObligations} max={500000} step={10000} error={errors.capitalCallObligations} onChange={(v) => setInput('capitalCallObligations', v)} />
             </AccordionContent>
           </AccordionItem>
 
@@ -406,6 +407,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             <AccordionTrigger>College & Kids <Chip>{inputs.collegeEvents.length} kids</Chip></AccordionTrigger>
             <AccordionContent className="grid gap-2">
               <p className="text-[11px] text-[var(--text-muted)]">College costs modeled as annual withdrawals net of 529 savings.</p>
+              {errors.collegeEvents && <p className="text-[10px] text-[var(--danger)]">{errors.collegeEvents}</p>}
               {inputs.collegeEvents.map((event) => (
                 <div key={event.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2 grid gap-2">
                   <div className="flex items-center justify-between">

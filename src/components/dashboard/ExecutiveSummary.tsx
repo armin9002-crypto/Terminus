@@ -89,15 +89,17 @@ export function ExecutiveSummary() {
 
   useEffect(() => {
     if (!results) return;
+    let cancelled = false;
     setLoading(true);
     const n = Math.min(inputs.numSimulations, 250);
-    setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       const noCarryRate = runSimulation({ ...inputs, carryAwards: [], numSimulations: n }).successRate;
       const earlierRate = runSimulation({ ...inputs, retirementAge: Math.max(inputs.currentAge + 1, inputs.retirementAge - 3), numSimulations: n }).successRate;
       const laterRate = runSimulation({ ...inputs, retirementAge: Math.min(inputs.planningAge - 1, inputs.retirementAge + 3), numSimulations: n }).successRate;
       const sustainSpend = solveSustainableSpend(inputs);
       const highSpendRate = runSimulation({ ...inputs, spendingGoGo: inputs.spendingGoGo * 1.2, spendingSlowGo: inputs.spendingSlowGo * 1.2, spendingNoGo: inputs.spendingNoGo * 1.2, numSimulations: n }).successRate;
       const lowSpendRate = runSimulation({ ...inputs, spendingGoGo: inputs.spendingGoGo * 0.8, spendingSlowGo: inputs.spendingSlowGo * 0.8, spendingNoGo: inputs.spendingNoGo * 0.8, numSimulations: n }).successRate;
+      if (cancelled) return;
       setComparative({
         noCarry: noCarryRate,
         retireEarlier: earlierRate,
@@ -108,7 +110,11 @@ export function ExecutiveSummary() {
       });
       setLoading(false);
     }, 0);
-  }, [results?.successRate, inputs.retirementAge, inputs.spendingGoGo]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [results, inputs]);
 
   if (!results) {
     return (

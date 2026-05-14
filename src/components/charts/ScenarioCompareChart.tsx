@@ -26,6 +26,8 @@ export function ScenarioCompareChart() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    let timeoutId: number | undefined;
     setLoading(true);
     const baseInputs = noCarry ? { ...inputs, carryAwards: [] } : inputs;
     const reducedInputs = { ...baseInputs, numSimulations: Math.min(baseInputs.numSimulations, 750) };
@@ -34,6 +36,7 @@ export function ScenarioCompareChart() {
     const finalResults: ScenarioResult[] = [];
 
     function runNext() {
+      if (cancelled) return;
       if (index >= scenarios.length) {
         setScenarioResults(finalResults);
         setLoading(false);
@@ -46,10 +49,14 @@ export function ScenarioCompareChart() {
       
       finalResults.push({ ...scenario, result, monthlySpend });
       index++;
-      setTimeout(runNext, 0);
+      timeoutId = window.setTimeout(runNext, 0);
     }
 
-    setTimeout(runNext, 0);
+    timeoutId = window.setTimeout(runNext, 0);
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
   }, [inputs, noCarry]);
 
   const chartData = scenarioResults[0]?.result?.percentilePaths?.map((point: PercentilesAtAge, index: number) => ({

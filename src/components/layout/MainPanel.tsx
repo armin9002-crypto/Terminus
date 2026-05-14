@@ -7,6 +7,7 @@ import { SpendingSmileChart } from "../../components/charts/SpendingSmileChart";
 import { StressTestChart } from "../../components/charts/StressTestChart";
 import { WealthFanChart } from "../../components/charts/WealthFanChart";
 import { HeroVerdict } from "../../components/dashboard/HeroVerdict";
+import { NetWorthSnapshot } from "../../components/dashboard/NetWorthSnapshot";
 import { StatCard } from "../../components/dashboard/StatCard";
 import { TaxBreakdownPanel } from "../../components/dashboard/TaxBreakdownPanel";
 import { ExecutiveSummary } from "../../components/dashboard/ExecutiveSummary";
@@ -52,7 +53,7 @@ export function MainPanel({ activeTab = "rich", onTabChange }: MainPanelProps) {
       </div>
 
       <HeroVerdict inputs={inputs} results={results} />
-      {/* <NetWorthSnapshot inputs={inputs} /> */}
+      <NetWorthSnapshot inputs={inputs} />
       <div className="grid gap-3 md:grid-cols-3">
         <StatCard 
           icon={ShieldAlert} 

@@ -11,7 +11,7 @@ function randomNormal(): number {
 
 function logNormalReturn(mu: number, sigma: number): number {
   const z = randomNormal();
-  return (1 + mu) * Math.exp(sigma * z) - 1;
+  return Math.exp(mu - 0.5 * sigma * sigma + sigma * z) - 1;
 }
 
 function percentile(values: number[], target: number): number {
@@ -144,9 +144,10 @@ function socialSecurityIncome(age: number, inputs: SimInputs): number {
   }
   
   // Spouse SS
-  if (inputs.hasSpouse && age >= inputs.spouseSocialSecurityAge) {
+  const spouseAge = age - (inputs.currentAge - inputs.spouseCurrentAge);
+  if (inputs.hasSpouse && spouseAge >= inputs.spouseSocialSecurityAge) {
     const spouseClaimingFactor = getSocialSecurityClaimingFactor(inputs.spouseSocialSecurityAge);
-    const yearsOfInflation = Math.max(0, age - inputs.spouseSocialSecurityAge);
+    const yearsOfInflation = Math.max(0, spouseAge - inputs.spouseSocialSecurityAge);
     income += inputs.spouseSocialSecurityAmount * spouseClaimingFactor * SS_TRUST_FUND_HAIRCUT * Math.pow(1 + inputs.inflationRate, yearsOfInflation);
   }
   
@@ -163,7 +164,7 @@ export function getTotalNetWorth(inputs: SimInputs): number {
 
 export function getCumulativeMortality(fromAge: number, toAge: number): number {
   let survival = 1;
-  for (let age = fromAge; age <= toAge; age += 1) {
+  for (let age = fromAge; age < toAge; age += 1) {
     survival *= 1 - (SSA_MORTALITY_QX[age] ?? 0.0);
   }
   return (1 - survival) * 100;

@@ -18,6 +18,8 @@ export function StressTestChart() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    let timeoutId: number | undefined;
     setLoading(true);
     setRows([]);
     
@@ -31,6 +33,7 @@ export function StressTestChart() {
     const results: ResultRow[] = [];
     
     function runNext() {
+      if (cancelled) return;
       if (index >= STRESS_SCENARIOS.length) {
         setRows(results);
         setLoading(false);
@@ -41,10 +44,14 @@ export function StressTestChart() {
       const last = result.percentilePaths[result.percentilePaths.length - 1];
       results.push({ scenario, result, p10: last?.p10 ?? 0 });
       index++;
-      setTimeout(runNext, 0); // yield to browser between each
+      timeoutId = window.setTimeout(runNext, 0); // yield to browser between each
     }
     
-    setTimeout(runNext, 0);
+    timeoutId = window.setTimeout(runNext, 0);
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
   }, [inputs]);
 
   if (loading) {
