@@ -148,12 +148,12 @@ export function RetirementIncomeWaterfallChart() {
               labelFormatter={(age) => `Age ${age}`}
             />
             <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 11 }} />
-            <Bar dataKey="salaryIncome" name="Salary net of tax/savings" stackId="a" fill="#6366f1" fillOpacity={0.85} />
-            <Bar dataKey="ssIncome" name="Social Security (after tax)" stackId="a" fill="#38bdf8" fillOpacity={0.85} />
-            <Bar dataKey="carryIncome" name="Carry Distributions (net)" stackId="a" fill="#14b8a6" fillOpacity={0.85} />
-            <Bar dataKey="otherIncome" name="Other Income (after tax)" stackId="a" fill="#22c55e" fillOpacity={0.85} />
-            <Bar dataKey="portfolioDraw" name="Portfolio Draw" stackId="a" fill="#f97316" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
-            <Line dataKey="totalSpending" name="Total Outflows" stroke="#f1f5f9" strokeWidth={1.5} dot={false} type="monotone" strokeDasharray="4 2" />
+            <Bar isAnimationActive={false} dataKey="salaryIncome" name="Salary net of tax/savings" stackId="a" fill="#6366f1" fillOpacity={0.85} />
+            <Bar isAnimationActive={false} dataKey="ssIncome" name="Social Security (after tax)" stackId="a" fill="#38bdf8" fillOpacity={0.85} />
+            <Bar isAnimationActive={false} dataKey="carryIncome" name="Carry Distributions (net)" stackId="a" fill="#14b8a6" fillOpacity={0.85} />
+            <Bar isAnimationActive={false} dataKey="otherIncome" name="Other Income (after tax)" stackId="a" fill="#22c55e" fillOpacity={0.85} />
+            <Bar isAnimationActive={false} dataKey="portfolioDraw" name="Portfolio Draw" stackId="a" fill="#f97316" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
+            <Line isAnimationActive={false} dataKey="totalSpending" name="Total Outflows" stroke="#f1f5f9" strokeWidth={1.5} dot={false} type="monotone" strokeDasharray="4 2" />
             <ReferenceLine x={inputs.retirementAge} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: "Retire", fill: "#f59e0b", fontSize: 10, position: "insideTopLeft" }} />
             <ReferenceLine x={inputs.socialSecurityAge} stroke="#38bdf8" strokeDasharray="3 3" label={{ value: "SS", fill: "#38bdf8", fontSize: 10, position: "insideTopLeft" }} />
           </ComposedChart>

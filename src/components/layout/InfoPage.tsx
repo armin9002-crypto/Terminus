@@ -5,8 +5,8 @@ import { CARRY_DISTRIBUTION_CURVE } from "../../lib/constants";
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section id={id} className="grid gap-3 scroll-mt-16">
-      <h2 className="text-sm font-bold text-[var(--text-primary)] border-b border-[var(--border)] pb-2">
+    <section id={id} className="grid gap-3 scroll-mt-28">
+      <h2 tabIndex={-1} className="text-sm font-bold text-[var(--text-primary)] border-b border-[var(--border)] pb-2">
         {title}
       </h2>
       <div className="grid gap-3 text-xs leading-relaxed text-[var(--text-secondary)]">
@@ -86,7 +86,7 @@ export function InfoPage() {
             {NAV.map((item) => (
               <li key={item.id}>
                 <a
-                  href={`#${item.id}`}
+                  href={`#guide/${item.id}`}
                   className="block text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors py-0.5 pl-2 border-l border-transparent hover:border-[var(--accent)]"
                 >
                   {item.label}
@@ -265,7 +265,7 @@ export function InfoPage() {
             <p>
               Real estate equity, PE fund NAV, syndication interests, private company stakes,
               and other assets that cannot be quickly liquidated. These appear in net worth
-              calculations in the sidebar but are excluded from the investable pool. The
+              calculations in Plan but are excluded from the investable pool. The
               simulation will not sell them to fund spending shortfalls.
             </p>
             <p>
@@ -586,7 +586,7 @@ export function InfoPage() {
             </p>
             <p>
               Note: the model does not increase your illiquid asset value as the mortgage
-              is paid down. Your net worth display in the sidebar subtracts the current
+              is paid down. Your net worth display in Plan subtracts the current
               mortgage balance, but the simulation does not credit home equity growth
               year-by-year. This means net worth accumulation during the mortgage
               paydown period is modestly understated.
@@ -738,7 +738,7 @@ export function InfoPage() {
               and the annual savings breakdown.
             </p>
             <p>
-              This panel updates live with sidebar inputs. It does not model
+              This panel updates live with Plan inputs. It does not model
               AMT, investment income surtaxes, state-specific deductions, qualified
               dividend treatment, or capital gains stacking rules.
             </p>

@@ -84,13 +84,13 @@ export function WithdrawalRateChart() {
               formatter={(value: number, name: string) => [`${(value * 100).toFixed(1)}%`, name]}
               labelFormatter={(age) => `Age ${age}`}
             />
-            <Area type="monotone" dataKey="band" name="10th-90th pct range" stroke="none" fill="#14b8a6" fillOpacity={0.10} activeDot={false} />
+            <Area isAnimationActive={false} type="monotone" dataKey="band" name="10th-90th pct range" stroke="none" fill="#14b8a6" fillOpacity={0.10} activeDot={false} />
             <ReferenceLine y={0.04} stroke="#22c55e" strokeDasharray="5 3" label={{ value: "4% safe rate", fill: "#22c55e", fontSize: 10, position: "insideTopRight" }} />
             <ReferenceLine y={0.06} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: "6% caution", fill: "#f59e0b", fontSize: 10, position: "insideTopRight" }} />
             <ReferenceLine y={0.08} stroke="#ef4444" strokeDasharray="5 3" label={{ value: "8% danger", fill: "#ef4444", fontSize: 10, position: "insideTopRight" }} />
-            <Line dataKey="rateP10" name="10th pct (bad scenario)" stroke="#ef4444" strokeWidth={1.5} dot={false} type="monotone" />
-            <Line dataKey="rateP50" name="Median" stroke="#e2fffb" strokeWidth={2} dot={false} type="monotone" />
-            <Line dataKey="rateP90" name="90th pct (good scenario)" stroke="#22c55e" strokeWidth={1.5} dot={false} type="monotone" />
+            <Line isAnimationActive={false} dataKey="rateP10" name="10th pct (bad scenario)" stroke="#ef4444" strokeWidth={1.5} dot={false} type="monotone" />
+            <Line isAnimationActive={false} dataKey="rateP50" name="Median" stroke="#e2fffb" strokeWidth={2} dot={false} type="monotone" />
+            <Line isAnimationActive={false} dataKey="rateP90" name="90th pct (good scenario)" stroke="#22c55e" strokeWidth={1.5} dot={false} type="monotone" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

@@ -56,12 +56,12 @@ export function RichBrokeDeadChart() {
           <ComposedChart data={data} margin={{ top: 24, right: 28, bottom: 12, left: 8 }}>
             <CartesianGrid stroke="#2d3748" strokeOpacity={0.5} vertical={false} />
             <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
-            <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} width={58} />
+            <YAxis domain={[0, 100]} tickFormatter={(value) => `${Math.round(value)}%`} tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} width={58} />
             <Tooltip content={<PercentTooltip />} />
             <ReferenceLine x={inputs.retirementAge} stroke="#f59e0b" strokeDasharray="5 5" label={{ value: "Retire", fill: "#f59e0b", position: "insideTopRight" }} />
             <ReferenceLine x={inputs.socialSecurityAge} stroke="#38bdf8" strokeDasharray="5 5" label={{ value: "SS", fill: "#38bdf8", position: "insideTopRight" }} />
             {bands.map((band) => (
-              <Area key={band.key} type="monotone" dataKey={band.key} stackId="a" stroke="none" fill={band.color} fillOpacity={band.key === "dead" ? 0.7 : 0.92} />
+              <Area isAnimationActive={false} key={band.key} type="monotone" dataKey={band.key} stackId="a" stroke="none" fill={band.color} fillOpacity={band.key === "dead" ? 0.7 : 0.92} />
             ))}
           </ComposedChart>
         </ResponsiveContainer>

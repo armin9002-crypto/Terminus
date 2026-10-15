@@ -24,8 +24,8 @@ export function NetWorthSnapshot({ inputs }: NetWorthSnapshotProps) {
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-mutedText">Net Worth Snapshot</p>
-        <p className="text-sm font-semibold text-primaryText">Total {formatCompactCurrency(gross)}</p>
+        <p className="text-xs font-medium text-mutedText">Asset snapshot</p>
+        <p className="text-sm font-semibold text-primaryText">Total assets {formatCompactCurrency(gross)}</p>
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_180px] lg:items-center">
         <div>
@@ -44,7 +44,7 @@ export function NetWorthSnapshot({ inputs }: NetWorthSnapshotProps) {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
               <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid #2d3748", color: "#f1f5f9" }} formatter={(value) => formatCompactCurrency(Number(value))} />
-              <Pie data={data} dataKey="value" nameKey="name" innerRadius={42} outerRadius={62} paddingAngle={2}>
+              <Pie isAnimationActive={false} data={data} dataKey="value" nameKey="name" innerRadius={42} outerRadius={62} paddingAngle={2}>
                 {data.map((item, index) => <Cell key={item.name} fill={colors[index]} />)}
               </Pie>
             </PieChart>

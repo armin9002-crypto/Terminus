@@ -2,9 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="preload" href="/fonts/inter-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>" />
-    <title>the Number — Private Wealth Lab</title>
+    <meta name="description" content="A quiet, precise instrument for understanding your financial future. Explore your personal wealth plan with the Number." />
+    <title>the Number — Private wealth planning</title>
+    <script>
+      // Resolve appearance before paint, including legacy preferences. Financial storage is untouched.
+      try {
+        var preference = localStorage.getItem('terminus-theme');
+        var light = preference === 'light' || preference === 'porcelain' || (preference === 'system' && matchMedia('(prefers-color-scheme: light)').matches);
+        document.documentElement.dataset.theme = light ? 'porcelain' : 'graphite';
+        document.documentElement.dataset.reduceTransparency = localStorage.getItem('terminus-reduce-transparency') === 'true' ? 'true' : 'false';
+        document.documentElement.dataset.reduceMotion = localStorage.getItem('terminus-reduce-motion') === 'true' ? 'true' : 'false';
+      } catch (_) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

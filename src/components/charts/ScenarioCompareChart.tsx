@@ -107,9 +107,9 @@ export function ScenarioCompareChart() {
             <XAxis dataKey="age" tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={{ stroke: "#2d3748" }} />
             <YAxis tickFormatter={formatCompactCurrency} tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} width={78} />
             <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid #2d3748", color: "#f1f5f9" }} formatter={(value) => formatCompactCurrency(Number(value))} />
-            <Line dataKey="retire52" name="Retire at 52" stroke="#14b8a6" strokeWidth={2} dot={false} />
-            <Line dataKey="retire55" name="Retire at 55" stroke="#22c55e" strokeWidth={2} dot={false} />
-            <Line dataKey="retire58" name="Retire at 58" stroke="#f59e0b" strokeWidth={2} dot={false} />
+            <Line isAnimationActive={false} dataKey="retire52" name="Retire at 52" stroke="#14b8a6" strokeWidth={2} dot={false} />
+            <Line isAnimationActive={false} dataKey="retire55" name="Retire at 55" stroke="#22c55e" strokeWidth={2} dot={false} />
+            <Line isAnimationActive={false} dataKey="retire58" name="Retire at 58" stroke="#f59e0b" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>

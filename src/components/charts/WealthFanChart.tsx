@@ -142,7 +142,7 @@ export function WealthFanChart() {
               label={{ value: "SS Starts", fill: "#38bdf8", position: "insideTopRight" }}
             />
             {showWide && (
-              <Area
+              <Area isAnimationActive={false}
                 type="monotone"
                 dataKey="p10p90"
                 name="10th-90th percentile"
@@ -153,7 +153,7 @@ export function WealthFanChart() {
               />
             )}
             {showNarrow && (
-              <Area
+              <Area isAnimationActive={false}
                 type="monotone"
                 dataKey="p25p75"
                 name="25th-75th percentile"
@@ -163,7 +163,7 @@ export function WealthFanChart() {
                 activeDot={false}
               />
             )}
-            <Line type="monotone" dataKey="p50" name="Median" stroke="#e2fffb" strokeWidth={2} dot={false} />
+            <Line isAnimationActive={false} type="monotone" dataKey="p50" name="Median" stroke="#e2fffb" strokeWidth={2} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

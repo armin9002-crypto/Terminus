@@ -6,10 +6,10 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const variants = {
-  primary: "bg-accent text-slate-950 hover:bg-teal-300",
+  primary: "bg-accent text-background hover:brightness-110",
   secondary: "border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-primary)] hover:bg-[var(--bg-card)]",
-  ghost: "text-mutedText hover:bg-white/[0.06] hover:text-primaryText",
-  danger: "bg-danger/15 text-red-200 hover:bg-danger/25",
+  ghost: "text-mutedText hover:bg-[var(--surface-raised)] hover:text-primaryText",
+  danger: "bg-danger/10 text-danger hover:bg-danger/20",
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -17,7 +17,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 text-sm font-medium disabled:pointer-events-none disabled:opacity-50",
         variants[variant],
         className,
       )}

@@ -122,9 +122,9 @@ export function BucketDepletionChart() {
               labelFormatter={(age) => `Age ${age}`}
             />
             <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 11 }} />
-            <Area type="monotone" dataKey="taxable" name="Taxable Brokerage" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.20} strokeWidth={2} />
-            <Area type="monotone" dataKey="deferred" name="Traditional IRA/401k" stroke="#f97316" fill="#f97316" fillOpacity={0.20} strokeWidth={2} />
-            <Area type="monotone" dataKey="roth" name="Roth IRA/401k" stroke="#22c55e" fill="#22c55e" fillOpacity={0.20} strokeWidth={2} />
+            <Area isAnimationActive={false} type="monotone" dataKey="taxable" name="Taxable Brokerage" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.20} strokeWidth={2} />
+            <Area isAnimationActive={false} type="monotone" dataKey="deferred" name="Traditional IRA/401k" stroke="#f97316" fill="#f97316" fillOpacity={0.20} strokeWidth={2} />
+            <Area isAnimationActive={false} type="monotone" dataKey="roth" name="Roth IRA/401k" stroke="#22c55e" fill="#22c55e" fillOpacity={0.20} strokeWidth={2} />
             <ReferenceLine x={inputs.retirementAge} stroke="#f59e0b" strokeDasharray="5 3" label={{ value: "Retire", fill: "#f59e0b", fontSize: 10, position: "insideTopRight" }} />
             <ReferenceLine x={73} stroke="#8b5cf6" strokeDasharray="4 3" label={{ value: "RMDs", fill: "#8b5cf6", fontSize: 10, position: "insideTopLeft" }} />
           </AreaChart>

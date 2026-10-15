@@ -43,13 +43,13 @@ export function HeroVerdict({ inputs, results }: HeroVerdictProps) {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,0.9fr)] lg:items-center">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-mutedText">Live verdict</p>
-          <h1 className="mt-1.5 text-[20px] font-bold leading-tight text-primaryText md:text-2xl">
+          <h2 className="mt-1.5 text-[20px] font-bold leading-tight text-primaryText md:text-2xl">
             You can sustain {formatCompactCurrency(inputs.spendingGoGo)}/year with{" "}
             <span className={cn("transition-all duration-300", activeTone.text)}>
               {successRate === undefined ? "--" : formatPercentage(successRate, 0)}
             </span>{" "}
             confidence through age {inputs.planningAge}
-          </h1>
+          </h2>
           <p className="mt-1 text-xs font-semibold" style={{color: 'var(--accent)'}}>
             Safe sustainable spend at 85% confidence: 
             {sustainableSpend ? `${formatCompactCurrency(sustainableSpend * 12)}/year | ${formatCompactCurrency(sustainableSpend)}/month` : "--"}

@@ -48,7 +48,7 @@ function SectionTrigger({ title, summary, help }: { title: string; summary: stri
   );
 }
 
-export function Sidebar({ mobile = false }: { mobile?: boolean }) {
+export function Sidebar() {
   const inputs = useSimStore((state) => state.inputs);
   const errors = useSimStore((state) => state.errors);
   const setInput = useSimStore((state) => state.setInput);
@@ -67,8 +67,8 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const totalCollegeNeed = inputs.collegeEvents.reduce((sum, event) => sum + Math.max(0, event.annualCost * event.years - event.existingSavings529), 0);
 
   return (
-    <aside className={`${mobile ? "max-h-[85vh]" : "h-[calc(100vh-56px)] lg:sticky lg:top-[56px]"} sidebar-scroll flex flex-col border-r border-[var(--border)] bg-[var(--bg-secondary)]`}>
-      <div className="flex-1 overflow-y-auto p-3 pb-20">
+    <div className="plan-form">
+      <div>
         <Accordion type="multiple" defaultValue={["you", "assets"]} className="grid gap-2">
           <AccordionItem value="you" className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2">
             <AccordionTrigger><SectionTrigger title="You & Your Spouse" summary={`${inputs.currentAge} -> ${inputs.retirementAge} / ${inputs.planningAge}`} /></AccordionTrigger>
@@ -80,7 +80,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               <AgeInput label="Plan to age" value={inputs.planningAge} min={75} max={100} error={errors.planningAge} onChange={(value) => setInput("planningAge", value)} />
               <div className="flex items-center justify-between rounded-md border border-[var(--border)] bg-white/[0.03] px-3 py-1.5">
                 <span className="text-xs font-medium">Include spouse?</span>
-                <Switch checked={inputs.hasSpouse} onCheckedChange={(checked) => setInput("hasSpouse", checked)} />
+                <Switch aria-label="Include spouse" checked={inputs.hasSpouse} onCheckedChange={(checked) => setInput("hasSpouse", checked)} />
               </div>
               {inputs.hasSpouse && (
                 <div className="grid grid-cols-2 gap-2">
@@ -240,6 +240,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                   {(['mfj', 'single'] as const).map(status => (
                     <button
                       key={status}
+                      aria-pressed={inputs.filingStatus === status}
                       onClick={() => setInput('filingStatus', status)}
                       className={cn(
                         "flex-1 rounded-lg border py-2 text-xs font-bold transition-colors",
@@ -311,15 +312,16 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                 <div key={award.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-3 grid gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Award Item</span>
-                    <button onClick={() => removeCarryAward(award.id)} className="text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded p-1 transition-colors"><Trash2 size={14} /></button>
+                    <button aria-label={`Remove ${award.label}`} onClick={() => removeCarryAward(award.id)} className="text-[var(--danger)] hover:bg-[var(--surface-raised)] rounded p-3"><Trash2 size={16} /></button>
                   </div>
-                  <Input value={award.label} onChange={(e) => updateCarryAward({ ...award, label: e.target.value })} className="h-8 text-xs" />
+                  <Input aria-label="Carry award name" value={award.label} onChange={(e) => updateCarryAward({ ...award, label: e.target.value })} />
                   <div className="grid grid-cols-2 gap-2">
                     <div className="grid gap-1">
                       <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">
                         Vintage Year
                       </label>
                       <Input
+                        aria-label={`${award.label} vintage year`}
                         type="number"
                         value={award.vintageYear}
                         min={2010}
@@ -333,6 +335,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                         Your Award Value ($)
                       </label>
                       <Input
+                        aria-label={`${award.label} award value in dollars`}
                         type="number"
                         value={award.totalPoolValue}
                         onChange={(e) => updateCarryAward({ ...award, totalPoolValue: Number(e.target.value) })}
@@ -455,28 +458,28 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <label className="grid gap-1">
                       <span className="text-[var(--text-muted)] uppercase tracking-widest text-[10px]">Start Age</span>
-                      <input type="number" value={event.startYear} onChange={e => {
+                      <input aria-label={`${event.childName} college start age`} type="number" value={event.startYear} onChange={e => {
                         const updated = inputs.collegeEvents.map(ev => ev.id === event.id ? { ...ev, startYear: Number(e.target.value) } : ev);
                         setInput('collegeEvents', updated);
                       }} className="h-8 rounded border border-[var(--border)] bg-transparent px-2 text-[var(--text-primary)]" />
                     </label>
                     <label className="grid gap-1">
                       <span className="text-[var(--text-muted)] uppercase tracking-widest text-[10px]">Annual Cost</span>
-                      <input type="number" value={event.annualCost} onChange={e => {
+                      <input aria-label={`${event.childName} annual college cost`} type="number" value={event.annualCost} onChange={e => {
                         const updated = inputs.collegeEvents.map(ev => ev.id === event.id ? { ...ev, annualCost: Number(e.target.value) } : ev);
                         setInput('collegeEvents', updated);
                       }} className="h-8 rounded border border-[var(--border)] bg-transparent px-2 text-[var(--text-primary)]" />
                     </label>
                     <label className="grid gap-1">
                       <span className="text-[var(--text-muted)] uppercase tracking-widest text-[10px]">Years</span>
-                      <input type="number" value={event.years} min={1} max={6} onChange={e => {
+                      <input aria-label={`${event.childName} college funding years`} type="number" value={event.years} min={1} max={6} onChange={e => {
                         const updated = inputs.collegeEvents.map(ev => ev.id === event.id ? { ...ev, years: Number(e.target.value) } : ev);
                         setInput('collegeEvents', updated);
                       }} className="h-8 rounded border border-[var(--border)] bg-transparent px-2 text-[var(--text-primary)]" />
                     </label>
                     <label className="grid gap-1">
                       <span className="text-[var(--text-muted)] uppercase tracking-widest text-[10px]">529 balance</span>
-                      <input type="number" value={event.existingSavings529} onChange={e => {
+                      <input aria-label={`${event.childName} existing 529 savings`} type="number" value={event.existingSavings529} onChange={e => {
                         const updated = inputs.collegeEvents.map(ev => ev.id === event.id ? { ...ev, existingSavings529: Number(e.target.value) } : ev);
                         setInput('collegeEvents', updated);
                       }} className="h-8 rounded border border-[var(--border)] bg-transparent px-2 text-[var(--text-primary)]" />
@@ -496,7 +499,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
         </Accordion>
       </div>
 
-      <div className="sticky bottom-0 border-t border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2">
+      <div className="plan-form-footer">
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
           <div className="border-r border-[var(--border)] pr-4">
             <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Net Worth</p>
@@ -516,6 +519,6 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           </div>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

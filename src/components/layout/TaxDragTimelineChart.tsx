@@ -125,9 +125,9 @@ export function TaxDragTimelineChart() {
               formatter={(v: number, name: string) => [formatCompactCurrency(v), name]}
               labelFormatter={(age) => `Age ${age}`}
             />
-            <Area type="monotone" dataKey="ordinaryTax" name="Federal Ordinary (SS + deferred)" stackId="a" stroke="none" fill="#f97316" fillOpacity={0.80} />
-            <Area type="monotone" dataKey="ltcgTax" name="Federal LTCG (taxable + carry)" stackId="a" stroke="none" fill="#14b8a6" fillOpacity={0.80} />
-            <Area type="monotone" dataKey="stateTax" name="State Income Tax" stackId="a" stroke="none" fill="#8b5cf6" fillOpacity={0.80} />
+            <Area isAnimationActive={false} type="monotone" dataKey="ordinaryTax" name="Federal Ordinary (SS + deferred)" stackId="a" stroke="none" fill="#f97316" fillOpacity={0.80} />
+            <Area isAnimationActive={false} type="monotone" dataKey="ltcgTax" name="Federal LTCG (taxable + carry)" stackId="a" stroke="none" fill="#14b8a6" fillOpacity={0.80} />
+            <Area isAnimationActive={false} type="monotone" dataKey="stateTax" name="State Income Tax" stackId="a" stroke="none" fill="#8b5cf6" fillOpacity={0.80} />
             <ReferenceLine x={73} stroke="#f59e0b" strokeDasharray="4 3" label={{ value: "RMD Age 73", fill: "#f59e0b", fontSize: 10, position: "insideTopLeft" }} />
           </AreaChart>
         </ResponsiveContainer>

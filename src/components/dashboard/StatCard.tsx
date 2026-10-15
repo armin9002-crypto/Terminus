@@ -38,12 +38,12 @@ export function StatCard({ icon: Icon, label, value, description, tone = "neutra
           <div className="mt-2 h-8 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={sparklineData.map((v, i) => ({ i, v }))}>
-                <Line 
+                <Line
                   type="monotone" 
                   dataKey="v" 
                   stroke={sparklineColor ?? 'var(--accent)'} 
                   strokeWidth={1.5} 
-                  dot={false} 
+                  dot={false}
                   isAnimationActive={false}
                 />
                 <ReferenceLine y={0} stroke="#ef4444" strokeOpacity={0.4} />

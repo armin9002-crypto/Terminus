@@ -43,7 +43,7 @@ export function SpendingSmileChart() {
             formatter={(value) => [formatCompactCurrency(Number(value)), "Median spend"]}
             labelFormatter={(age) => `Age ${age}`}
           />
-          <Area type="monotone" dataKey="spending" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.22} strokeWidth={2} />
+          <Area isAnimationActive={false} type="monotone" dataKey="spending" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.22} strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
     </div>

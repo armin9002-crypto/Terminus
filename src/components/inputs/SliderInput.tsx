@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useId } from "react";
 import { Slider } from "../../components/ui/slider"; 
 import { formatCompactCurrency, formatPercentage } from "../../lib/formatters";
 import { useSimStore } from "../../store/useSimStore";
@@ -17,6 +17,8 @@ interface SliderInputProps {
 }
 
 export function SliderInput({ label, value, min, max, step, onChange, format = "number", error }: SliderInputProps) {
+  const inputId = useId();
+  const errorId = `${inputId}-error`;
   const [isDragging, setIsDragging] = useState(false);
   const [impact, setImpact] = useState<{ delta: number; visible: boolean }>({ delta: 0, visible: false });
   const results = useSimStore(state => state.results);
@@ -44,9 +46,9 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
     <div className="grid gap-0.5 py-0.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+          <label htmlFor={inputId} className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
             {label}
-          </span>
+          </label>
           {impact.visible && (
             <span className={cn(
               "text-[9px] font-bold",
@@ -60,6 +62,9 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
           )}
         </div>
         <input 
+          id={inputId}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
           type="text"
           value={
             format === "currency" 
@@ -98,6 +103,8 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
         )}
         
         <Slider 
+          aria-label={label}
+          aria-describedby={error ? errorId : undefined}
           value={[value]} 
           min={min} 
           max={max} 
@@ -108,7 +115,7 @@ export function SliderInput({ label, value, min, max, step, onChange, format = "
       </div>
 
       {error && (
-        <p className="text-[10px] text-[var(--danger)]">{error}</p>
+        <p id={errorId} className="text-[10px] text-[var(--danger)]">{error}</p>
       )}
     </div>
   );

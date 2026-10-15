@@ -5,14 +5,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: "var(--border)",
-        background: "var(--bg-primary)",
-        card: "var(--bg-card)",
+        border: "rgb(var(--line-rgb) / <alpha-value>)",
+        background: "rgb(var(--canvas-rgb) / <alpha-value>)",
+        card: "rgb(var(--surface-rgb) / <alpha-value>)",
         sidebar: "var(--bg-secondary)",
-        accent: "var(--accent)",
-        success: "var(--success)",
-        warning: "var(--warning)",
-        danger: "var(--danger)",
+        accent: "rgb(var(--accent-rgb) / <alpha-value>)",
+        success: "rgb(var(--positive-rgb) / <alpha-value>)",
+        warning: "rgb(var(--caution-rgb) / <alpha-value>)",
+        danger: "rgb(var(--negative-rgb) / <alpha-value>)",
         primaryText: "var(--text-primary)",
         mutedText: "var(--text-muted)",
         secondaryText: "var(--text-secondary)",
@@ -21,7 +21,7 @@ export default {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        terminal: "0 24px 70px rgba(0, 0, 0, 0.35)",
+        terminal: "none",
       },
     },
   },

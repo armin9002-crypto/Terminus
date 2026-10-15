@@ -120,7 +120,7 @@ export function CarryAwardsChart() {
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <p className="text-sm font-semibold text-[var(--text-muted)]">No carry awards added yet.</p>
         <p className="text-xs text-[var(--text-muted)] mt-2 max-w-xs">
-          Add carry awards in the sidebar to model PE carry distributions
+          Add carry awards in Plan to model PE carry distributions
           and GP commit outflows across your simulation.
         </p>
       </div>
@@ -194,9 +194,9 @@ export function CarryAwardsChart() {
                 labelFormatter={(year) => `${year}`}
               />
               <ReferenceLine y={0} stroke="#64748b" strokeOpacity={0.5} />
-              <Bar dataKey="gpCommit" name="GP Commit (outflow)" fill="#dc2626" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="netDistribution" name="Net Distribution" fill="#16a34a" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
-              <Line dataKey="cumulativeNet" name="Cumulative Net" stroke="#14b8a6" strokeWidth={2} dot={false} type="monotone" />
+              <Bar isAnimationActive={false} dataKey="gpCommit" name="GP Commit (outflow)" fill="#dc2626" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
+              <Bar isAnimationActive={false} dataKey="netDistribution" name="Net Distribution" fill="#16a34a" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
+              <Line isAnimationActive={false} dataKey="cumulativeNet" name="Cumulative Net" stroke="#14b8a6" strokeWidth={2} dot={false} type="monotone" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -300,21 +300,21 @@ export function CarryAwardsChart() {
                     }}
                   />
                   <ReferenceLine y={0} stroke="#64748b" strokeOpacity={0.5} />
-                  <Bar
+                  <Bar isAnimationActive={false}
                     dataKey="gpCommit"
                     name="GP Commit (outflow)"
                     fill="#dc2626"
                     fillOpacity={0.75}
                     radius={[2, 2, 0, 0]}
                   />
-                  <Bar
+                  <Bar isAnimationActive={false}
                     dataKey="netDistribution"
                     name="Net Distribution"
                     fill="#16a34a"
                     fillOpacity={0.85}
                     radius={[2, 2, 0, 0]}
                   />
-                  <Line
+                  <Line isAnimationActive={false}
                     dataKey="cumulativeNet"
                     name="Cumulative Net Cash"
                     stroke="#14b8a6"

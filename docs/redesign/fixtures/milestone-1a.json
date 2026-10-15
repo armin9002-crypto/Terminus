@@ -1,0 +1,242 @@
+{
+  "sourceBaseline": "2aad932",
+  "rng": "test-only mulberry32; no production RNG changes",
+  "cases": [
+    {
+      "name": "default household",
+      "inputs": {
+        "currentAge": 47,
+        "retirementAge": 55,
+        "planningAge": 92,
+        "hasSpouse": true,
+        "spouseCurrentAge": 45,
+        "spouseRetirementAge": 55,
+        "spousePlanningAge": 94,
+        "taxableAssets": 2500000,
+        "taxDeferredAssets": 800000,
+        "taxFreeAssets": 200000,
+        "illiquidAssets": 1500000,
+        "cashReserves": 350000,
+        "annualSalary": 650000,
+        "spouseAnnualSalary": 225000,
+        "socialSecurityAge": 67,
+        "socialSecurityAmount": 48000,
+        "spouseSocialSecurityAge": 67,
+        "spouseSocialSecurityAmount": 32400,
+        "otherRetirementIncome": 0,
+        "spendingGoGo": 175000,
+        "spendingSlowGo": 130000,
+        "spendingNoGo": 105000,
+        "goGoYears": 10,
+        "slowGoYears": 10,
+        "healthcareSurgeAmount": 45000,
+        "expectedReturn": 0.07,
+        "volatility": 0.15,
+        "inflationRate": 0.028,
+        "numSimulations": 1000,
+        "carryAwards": [],
+        "simulationStartYear": 2026,
+        "collegeEvents": [
+          {
+            "id": "college-1",
+            "childName": "Child 1",
+            "startYear": 50,
+            "annualCost": 95000,
+            "years": 4,
+            "existingSavings529": 180000
+          }
+        ],
+        "mortgageBalance": 900000,
+        "mortgageAnnualPayment": 96000,
+        "mortgageYearsRemaining": 12,
+        "capitalCallObligations": 80000,
+        "filingStatus": "mfj",
+        "numDependents": 2,
+        "stateIncomeTaxRate": 0.093,
+        "preTaxSavingsRate": 0.15,
+        "afterTaxSavingsRate": 0.2
+      },
+      "seed": 21014,
+      "resultHash": "3e0d7f7d93f123cb59831797c1bd7a6a27fea1e3bbac36426cf2cc37f5879516",
+      "summary": {
+        "successRate": 0.69,
+        "ruinProbability": 0.31,
+        "medianTerminalWealth": 12082128.52554093,
+        "percentileSamples": [
+          {
+            "age": 47,
+            "p10": 3426470.543069093,
+            "p25": 3768797.499491343,
+            "p50": 4124198.1584058,
+            "p75": 4545201.797498246,
+            "p90": 4928975.717835401
+          },
+          {
+            "age": 57,
+            "p10": 2736914.891079679,
+            "p25": 4224557.037769442,
+            "p50": 6044704.559898524,
+            "p75": 8956367.633790359,
+            "p90": 12947663.467778787
+          },
+          {
+            "age": 67,
+            "p10": 623695.5846370031,
+            "p25": 2787502.526644462,
+            "p50": 6858466.194398724,
+            "p75": 13202085.510995628,
+            "p90": 22315806.876972243
+          },
+          {
+            "age": 77,
+            "p10": 0,
+            "p25": 1899643.7681210386,
+            "p50": 8713105.48784812,
+            "p75": 22746556.790303007,
+            "p90": 42556483.504923746
+          },
+          {
+            "age": 87,
+            "p10": 0,
+            "p25": 0,
+            "p50": 10871312.473740097,
+            "p75": 38246414.582655355,
+            "p90": 88180571.34367077
+          }
+        ],
+        "finalBand": {
+          "age": 92,
+          "broke": 1.9659395647984923,
+          "struggling": 0.7863758259193969,
+          "surviving": 0.5009975019970352,
+          "thriving": 0.7293001611349246,
+          "flourishing": 2.3591274777581908,
+          "dead": 93.65825946839196,
+          "p10": 0,
+          "p25": 0,
+          "p50": 12082128.52554093,
+          "p75": 48816265.788096264,
+          "p90": 115436505.29622471
+        }
+      }
+    },
+    {
+      "name": "single household / later retirement",
+      "inputs": {
+        "currentAge": 47,
+        "retirementAge": 58,
+        "planningAge": 92,
+        "hasSpouse": false,
+        "spouseCurrentAge": 45,
+        "spouseRetirementAge": 55,
+        "spousePlanningAge": 94,
+        "taxableAssets": 2500000,
+        "taxDeferredAssets": 800000,
+        "taxFreeAssets": 200000,
+        "illiquidAssets": 1500000,
+        "cashReserves": 350000,
+        "annualSalary": 650000,
+        "spouseAnnualSalary": 225000,
+        "socialSecurityAge": 67,
+        "socialSecurityAmount": 48000,
+        "spouseSocialSecurityAge": 67,
+        "spouseSocialSecurityAmount": 32400,
+        "otherRetirementIncome": 0,
+        "spendingGoGo": 175000,
+        "spendingSlowGo": 130000,
+        "spendingNoGo": 105000,
+        "goGoYears": 10,
+        "slowGoYears": 10,
+        "healthcareSurgeAmount": 45000,
+        "expectedReturn": 0.07,
+        "volatility": 0.15,
+        "inflationRate": 0.028,
+        "numSimulations": 500,
+        "carryAwards": [],
+        "simulationStartYear": 2026,
+        "collegeEvents": [
+          {
+            "id": "college-1",
+            "childName": "Child 1",
+            "startYear": 50,
+            "annualCost": 95000,
+            "years": 4,
+            "existingSavings529": 180000
+          }
+        ],
+        "mortgageBalance": 900000,
+        "mortgageAnnualPayment": 96000,
+        "mortgageYearsRemaining": 12,
+        "capitalCallObligations": 80000,
+        "filingStatus": "mfj",
+        "numDependents": 2,
+        "stateIncomeTaxRate": 0.093,
+        "preTaxSavingsRate": 0.15,
+        "afterTaxSavingsRate": 0.2
+      },
+      "seed": 21015,
+      "resultHash": "6d911e79c8953f005951c1ebed4d072305c8ef5a05475eac050c82fc05e22270",
+      "summary": {
+        "successRate": 0.7,
+        "ruinProbability": 0.3,
+        "medianTerminalWealth": 10624150.46835484,
+        "percentileSamples": [
+          {
+            "age": 47,
+            "p10": 3426706.3627576083,
+            "p25": 3710563.4817550005,
+            "p50": 4102970.8805992496,
+            "p75": 4508378.550927891,
+            "p90": 4836156.634139391
+          },
+          {
+            "age": 57,
+            "p10": 2941734.035830823,
+            "p25": 4124325.350378848,
+            "p50": 5927426.239857405,
+            "p75": 8874321.402741887,
+            "p90": 12315145.488672614
+          },
+          {
+            "age": 67,
+            "p10": 787227.5844926285,
+            "p25": 2851143.222764306,
+            "p50": 6814349.030090814,
+            "p75": 12743089.451238314,
+            "p90": 22735761.674740378
+          },
+          {
+            "age": 77,
+            "p10": 0,
+            "p25": 1900307.2507583483,
+            "p50": 8051922.592510501,
+            "p75": 21669009.193826817,
+            "p90": 42123804.30975603
+          },
+          {
+            "age": 87,
+            "p10": 0,
+            "p25": 0,
+            "p50": 10292476.091634216,
+            "p75": 35871369.57686452,
+            "p90": 79352407.45437843
+          }
+        ],
+        "finalBand": {
+          "age": 92,
+          "broke": 1.9479422435887601,
+          "struggling": 0.9479985585465298,
+          "surviving": 0.5064649833330775,
+          "thriving": 0.7012592076919536,
+          "flourishing": 2.3894758188022123,
+          "dead": 93.50685918803747,
+          "p10": 0,
+          "p25": 0,
+          "p50": 10624150.46835484,
+          "p75": 49819138.19439263,
+          "p90": 107355387.8689167
+        }
+      }
+    }
+  ]
+}
